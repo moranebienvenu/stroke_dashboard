@@ -216,7 +216,7 @@ def api_generate_plots():
         return jsonify({
             "status": "success",
             "plots": plots_data,
-            "message": f"Generated plots for {len(subjects)} subjects"
+            #"message": f"Generated plots for {len(subjects)} subjects"
         })
         
     except Exception as e:
@@ -378,7 +378,7 @@ def api_generate_overlay():
             "status": "success",
             "overlay": overlay_data,
             "overlay_count": len(_global_data['overlays']),
-            "message": f"Overlay generated for {len(subjects)} subjects"
+            #"message": f"Overlay generated for {len(subjects)} subjects"
         })
         
     except Exception as e:

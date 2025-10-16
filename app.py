@@ -634,7 +634,7 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title):
     fig.update_layout(
         title=dict(
             text=title,
-            x=0.5,
+            x=0.001,
             xanchor='center'
         ),
         xaxis=dict(
@@ -645,9 +645,9 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title):
             autorange='reversed',
             tickfont=dict(size=10)
         ),
-        height=500,
-        width=600,
-        margin=dict(l=80, r=50, t=80, b=120),
+        height=250,
+        width=250,
+        #margin=dict(l=80, r=50, t=80, b=120),
         font=dict(size=10)
     )
     
@@ -798,7 +798,7 @@ def api_generate_cross_correlation_heatmaps():
         fig.update_layout(
             title=dict(
                 text=f"Cross Correlation: {session1} ({sex_filter1}) vs {session2} ({sex_filter2})",
-                x=0.5,
+                x=0.001,
                 xanchor='center'
             ),
             xaxis=dict(
@@ -811,9 +811,9 @@ def api_generate_cross_correlation_heatmaps():
                 autorange='reversed',
                 tickfont=dict(size=10)
             ),
-            height=600,
-            width=700,
-            margin=dict(l=120, r=50, t=100, b=120)
+            height=250,
+            width=250,
+            #margin=dict(l=120, r=50, t=100, b=120)
         )
         
         # Ajouter les formes pour les cases non significatives

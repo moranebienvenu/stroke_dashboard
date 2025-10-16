@@ -524,7 +524,9 @@ def api_generate_correlation_heatmaps():
             ] if f"tract_inj_{sys}" in df.columns],
             "Clinical Outcomes": [col for col in df.columns 
                         if col not in ['subject', 'Sexe_bin', 'sex', 'lesion_volume']
-                        and not col.startswith(('loc_inj_', 'tract_inj_', 'pre_', 'post_'))]
+                        and not col.startswith(('loc_inj_', 'tract_inj_', 'pre_', 'post_'))
+                        and not str(col).startswith('Unnamed') 
+                        and col != '' ]
         }
 
         # Dictionnaire pour tronquer les noms
@@ -547,17 +549,17 @@ def api_generate_correlation_heatmaps():
             "tract_inj_5HT4": "5HT4", "tract_inj_5HT6": "5HT6", "tract_inj_5HTT": "5HTT"
         }
         
-        if system_type != "Clinical Outcomes":
-            available_vars = [col for col in outcome_vars_map.get(system_type, []) if col in df.columns]
-            display_vars = [short_labels.get(var, var) for var in available_vars]
-        else : 
-            # CORRECTION : Sélectionner les variables selon system_type
-            available_vars = [col for col in outcome_vars_map.get(system_type, []) if col in df.columns]
-            display_vars = available_vars
-        
+        available_vars = [col for col in outcome_vars_map.get(system_type, []) if col in df.columns]
         if not available_vars:
             return jsonify({"error": f"No variables found for {system_type}"}), 404
        
+
+        if system_type != "Clinical Outcomes":
+            display_vars = [short_labels.get(var, var) for var in available_vars]
+        else : 
+            display_vars = available_vars
+        
+        
         
         # # Filtrer les variables disponibles
         # available_vars = [col for col in synaptic_vars if col in df.columns]
@@ -662,21 +664,21 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title, display_vars=None
     fig.update_layout(
         title=dict(
             text=title,
-            x=0.001,
+            x=0.5,
             xanchor='center'
         ),
         xaxis=dict(
             tickangle=45,
-            tickfont=dict(size=10)
+            tickfont=dict(size=8)
         ),
         yaxis=dict(
             autorange='reversed',
-            tickfont=dict(size=10)
+            tickfont=dict(size=8)
         ),
         height=300,
         width=300,
         margin=dict(l=10, r=0, t=20, b=30),
-        font=dict(size=10)
+        font=dict(size=9)
     )
     
     # Ajouter les formes pour les cases non significatives 

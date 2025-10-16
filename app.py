@@ -645,9 +645,9 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title):
             autorange='reversed',
             tickfont=dict(size=10)
         ),
-        height=250,
-        width=250,
-        margin=dict(l=80, r=50, t=80, b=120),
+        height=300,
+        width=300,
+        #margin=dict(l=40, r=10, t=50, b=60),
         font=dict(size=10)
     )
     

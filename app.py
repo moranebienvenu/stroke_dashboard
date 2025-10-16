@@ -118,8 +118,8 @@ def api_generate_plots():
         # Paramètres par défaut
         dataset = params.get('dataset', 'master')
         analysis_type = params.get('analysis_type', 'session_sex')
-        session = params.get('session', 'V1')
-        sex_filter = params.get('sex_filter', 'men')
+        session = params.get('session'), # 'V1')
+        sex_filter = params.get('sex_filter'), # 'men')
         selected_groups = params.get('groups', [])
         selected_subject = params.get('subject', None)
         
@@ -295,8 +295,8 @@ def api_generate_overlay():
         # Paramètres par défaut pour l'état naturel
         dataset = params.get('dataset', 'master')
         analysis_type = params.get('analysis_type', 'session_sex')  # État naturel
-        session = params.get('session', 'V1')  # État naturel
-        sex_filter = params.get('sex_filter', 'women')  # État naturel
+        session = params.get('session'), # 'V1')  # État naturel
+        sex_filter = params.get('sex_filter'), # 'women')  # État naturel
         selected_groups = params.get('groups', [])
         selected_subject = params.get('subject', None)
         overlay_title = params.get('title', 'Overlay')
@@ -645,9 +645,9 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title):
             autorange='reversed',
             tickfont=dict(size=10)
         ),
-        height=300,
-        width=300,
-        margin=dict(l=10, r=10, t=20, b=30),
+        height=400,
+        width=400,
+        margin=dict(l=10, r=0, t=20, b=30),
         font=dict(size=10)
     )
     

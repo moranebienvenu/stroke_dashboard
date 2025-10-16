@@ -647,7 +647,7 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title):
         ),
         height=300,
         width=300,
-        #margin=dict(l=40, r=10, t=50, b=60),
+        margin=dict(l=10, r=10, t=20, b=30),
         font=dict(size=10)
     )
     

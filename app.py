@@ -36,6 +36,7 @@ _global_data = {
     'dataset1': None,
     'dataset2': None,
     'master_data': None,
+    'master2': None,
     'current_plots': None
 }
 
@@ -55,6 +56,20 @@ def load_master_data_global():
 # Charger les données au démarrage
 load_master_data_global()
 
+def load_master2_data_global():
+    """Charge le deuxième dataset master2 au démarrage"""
+    path = "data/data_article_big_cohort.csv"
+    try:
+        df = pd.read_csv(path)
+        _global_data['master2'] = df.to_dict('records')
+        return True
+    except Exception as e:
+        print(f"Error loading master2 data: {e}")
+        return False
+
+# Charger master2 au démarrage
+load_master2_data_global()
+
 @server.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint de santé pour vérifier que l'API fonctionne"""
@@ -62,6 +77,7 @@ def health_check():
         "status": "healthy",
         "available_datasets": {
             "master": _global_data['master_data'] is not None,
+            "master2": _global_data['master2'] is not None,
             "dataset1": _global_data['dataset1'] is not None,
             "dataset2": _global_data['dataset2'] is not None
         }
@@ -74,6 +90,8 @@ def get_available_subjects():
     
     if dataset == 'master':
         data = _global_data['master_data']
+    elif dataset == 'master2':
+        data = _global_data['master2']
     elif dataset == 'dataset1':
         data = _global_data['dataset1']
     elif dataset == 'dataset2':
@@ -124,7 +142,7 @@ def api_generate_plots():
         selected_subject = params.get('subject', None)
         
         # Validation des paramètres
-        if dataset not in ['master', 'dataset1', 'dataset2']:
+        if dataset not in ['master', 'master2', 'dataset1', 'dataset2']:
             return jsonify({"error": "Invalid dataset"}), 400
         
         # if analysis_type not in ['single', 'session_sex']:
@@ -133,6 +151,8 @@ def api_generate_plots():
         # Sélectionner les données
         if dataset == 'master':
             data = _global_data['master_data']
+        elif dataset == 'master2':
+            data = _global_data['master2']
         elif dataset == 'dataset1':
             data = _global_data['dataset1']
         elif dataset == 'dataset2':
@@ -302,12 +322,14 @@ def api_generate_overlay():
         overlay_title = params.get('title', 'Overlay')
         
         # Validation
-        if dataset not in ['master', 'dataset1', 'dataset2']:
+        if dataset not in ['master', 'master2', 'dataset1', 'dataset2']:
             return jsonify({"error": "Invalid dataset"}), 400
         
         # Sélectionner les données
         if dataset == 'master':
             data = _global_data['master_data']
+        elif dataset == 'master2':
+            data = _global_data['master2']
         elif dataset == 'dataset1':
             data = _global_data['dataset1']
         elif dataset == 'dataset2':
@@ -489,12 +511,14 @@ def api_generate_correlation_heatmaps():
         groups = params.get('groups', ['A'])
         
         # Validation des paramètres
-        if dataset not in ['master', 'dataset1', 'dataset2']:
+        if dataset not in ['master', 'master2', 'dataset1', 'dataset2']:
             return jsonify({"error": "Invalid dataset"}), 400
         
         # Sélectionner les données
         if dataset == 'master':
             data = _global_data['master_data']
+        elif dataset == 'master2':
+            data = _global_data['master2']
         elif dataset == 'dataset1':
             data = _global_data['dataset1']
         elif dataset == 'dataset2':
@@ -729,6 +753,8 @@ def api_generate_cross_correlation_heatmaps():
         # Sélectionner les données
         if dataset == 'master':
             data = _global_data['master_data']
+        elif dataset == 'master2':
+            data = _global_data['master2']
         elif dataset == 'dataset1':
             data = _global_data['dataset1']
         elif dataset == 'dataset2':

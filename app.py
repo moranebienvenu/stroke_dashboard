@@ -909,6 +909,8 @@ def api_generate_cross_correlation_heatmaps():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
 # ---------------------------- Used functions --------------------------------
 
 def process_zip_to_dataframe(contents, filename):
@@ -1268,53 +1270,6 @@ def get_dataset(dataset_sel, data1, data2, master_store, data_source):
         return master_store
 
     return None
-
-#a implémenter pour la gestion base/overlay plot
-# def select_subjects(df, analysis_type, selected_subject, session, sex_filter, selected_groups):
-#     """
-#     Retourne la liste de sujets selon le type d'analyse et les filtres
-#     """
-#     if analysis_type == 'single':
-#         if not selected_subject:
-#             return [], "Error: Please select a subject"
-#         return [selected_subject], f"Subject: {selected_subject}"
-
-#     elif analysis_type == 'session_sex':
-#         if not session:
-#             return [], "Error: Please select a session"
-
-#         # Filtrer par session
-#         session_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
-
-#         # Filtrer par sexe
-#         if sex_filter != 'all' and 'sex' in df.columns:
-#             gender = "M" if sex_filter == 'men' else "F"
-#             session_subjects = df[
-#                 (df['subject'].isin(session_subjects)) &
-#                 (df['sex'] == gender)
-#             ]['subject'].tolist()
-
-#         # Filtrer par groupes
-#         if selected_groups:
-#             subjects = [s for s in session_subjects if detect_group(s) in selected_groups]
-#         else:
-#             subjects = session_subjects
-
-#         if not subjects:
-#             return [], "Error: No subjects found for these criteria"
-
-#         # Construire le titre
-#         title = f"Session {session}"
-#         if sex_filter != 'all':
-#             title += f" ({'Men' if sex_filter == 'men' else 'Women'})"
-#         if selected_groups:
-#             title += f" | Groups: {', '.join(selected_groups)}"
-
-#         return subjects, title
-
-#     else:
-#         return [], "Error: Unknown analysis type"
-
 
 #nouvelle fonction pour les statistiques
 def get_data_for_analysis(dataset_sel, data1, data2, master_store):
@@ -2153,6 +2108,51 @@ app.layout = dbc.Container([
     # ==================== SECTION UPLOAD =============================
     html.Hr(),
     html.H3("📦 Data Upload"),
+    html.P(
+        [
+            "The ZIP file must include the following files:",
+            html.Ul([
+                html.Li("One or more output_les_dis_sub-XXX_ses-VX.csv files"),
+                html.Li("One or more output_pre_post_synaptic_ratio_sub-XXX_ses-VX.csv files"),
+                html.Li("(Optional) One clinical_data.csv or .xlsx file"),
+            ]),
+            html.Strong("Important:"),
+            html.Ul([
+                html.Li([
+                    "Subject IDs must follow the format: ",
+                    html.Code("sub-<group letter><digits>_ses-V<session number>"),
+                    ", for example: ",
+                    html.Code("sub-A01_ses-V1"),
+                    " or ",
+                    html.Code("sub-G1234_ses-V2"),
+                    "."
+                ]),
+                html.Li("Group letters: NA (Non-aphasic), A (Aphasic), G (Global), W (Wernicke), B (Broca), C (Conduction), AN (Anomic), TCM (Transcortical Motor), TCS (Transcortical Sensory), TCMix (Transcortical Mixed)"),
+                html.Li("The clinical_data file must include a 'subject' column matching the filenames exactly."),
+                html.Li("Additional columns such as sex, timepoint, repetition_score, comprehension_score, naming_score, composite_score, lesion_volume are optional."),
+                html.Li("Lesion volume must be in mm³."),
+            ]),
+            html.Br(),
+            "You can use the example file ",
+            html.A(
+                "synthetic_dataset.zip",
+                href="https://github.com/moranebienvenu/stroke_dashboard",
+                target="_blank",
+                style={"textDecoration": "underline"}
+            ),
+            " available on GitHub."
+        ],
+        ## need to have the possibility to use synthetuc dataset directly on the App with the second option dataset. 
+        style={
+            "backgroundColor": "#f8f9fa",
+            "padding": "15px",
+            "borderRadius": "10px",
+            "border": "1px solid #dee2e6",
+            "fontSize": "14px",
+            "lineHeight": "1.6"
+        }
+    ),
+
     dbc.Row([
         dbc.Col([
             html.Label("Upload Dataset 1", className="form-label"),
@@ -3249,14 +3249,21 @@ def update_groups_and_count(session, sex_filter, selected_groups, selected_subje
         
         # 1. Filtrer par session
         session_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
+
+        print(f"DEBUG update_groups_and_count: Session {session}, found {len(session_subjects)} subjects")
+        print(f"DEBUG update_groups_and_count: sex_filter value = '{sex_filter}' (type: {type(sex_filter)})")
         
         # 2. Filtrer par sexe
-        if sex_filter != 'all' and 'sex' in df.columns:
+        if sex_filter and sex_filter != 'all' and 'sex' in df.columns:
             gender = "M" if sex_filter == 'men' else "F"
+            print(f"DEBUG update_groups_and_count: Filtering by gender = {gender}")
+            before_count = len(session_subjects)
             session_subjects = df[
                 (df['subject'].isin(session_subjects)) & 
                 (df['sex'] == gender)
             ]['subject'].tolist()
+            print(f"DEBUG update_groups_and_count: After sex filter: {before_count} -> {len(session_subjects)} subjects")
+            print(f"DEBUG update_groups_and_count: Unique sex values in df: {df['sex'].unique()}")
         
         # 3. Obtenir les groupes disponibles pour cette sélection
         available_groups = sorted({detect_group(subj) for subj in session_subjects})
@@ -3269,6 +3276,8 @@ def update_groups_and_count(session, sex_filter, selected_groups, selected_subje
             filtered_subjects = session_subjects
         
         count = f"{len(filtered_subjects)} subjects selected"
+
+        print(f"DEBUG update_groups_and_count: Final count: {count}")
         
         return group_options, count
     
@@ -3330,12 +3339,13 @@ def generate_plots(n_clicks, analysis_type, dataset_sel, data1, data2,
             session_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
             
             # Filtrer par sexe
-            if sex_filter != 'all' and 'sex' in df.columns:
+            if sex_filter and sex_filter != 'all' and 'sex' in df.columns:
                 gender = "M" if sex_filter == 'men' else "F"
                 session_subjects = df[
                     (df['subject'].isin(session_subjects)) & 
                     (df['sex'] == gender)
                 ]['subject'].tolist()
+                print(f"DEBUG: After sex filter ({sex_filter}): {len(session_subjects)} subjects")
             
             # Filtrer par groupes
             if selected_groups:
@@ -3546,7 +3556,7 @@ def update_overlay_count(session, sex_filter, selected_groups, selected_subject,
     """Compte les sujets d'overlay"""
     
     # Sélectionner le dataset approprié
-    data = get_dataset(dataset_sel, data1, data2, master_store, data_source)
+    data = get_dataset(data1, data2, master_store, data_source) #dataset_sel,
     # if data_source == 'master':
     #     data = master_store
     # else:

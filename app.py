@@ -2228,7 +2228,7 @@ app.layout = dbc.Container([
                         {'label': 'Single subject', 'value': 'single'},
                         {'label': 'By session and sex', 'value': 'session_sex'}
                     ],
-                    value='session_sex',
+                    value='single',
                     inline=True
                 )
             ], width=6),
@@ -3148,21 +3148,20 @@ def toggle_selection_containers(analysis_type):
      Output('group-checklist', 'options'),
      Output('group-checklist', 'value')],
     [Input('dataset-selector', 'value'),
-     Input('analysis-type', 'value')],
-    [State('dataset1-store', 'data'),
-     State('dataset2-store', 'data'),
-     State('data-source', 'value'),
-     State('master-store', 'data')]
+     Input('analysis-type', 'value'),
+     Input('dataset1-store', 'data'), 
+     Input('dataset2-store', 'data')],
+    # [State('dataset1-store', 'data'),
+    #  State('dataset2-store', 'data'),
+     [State('data-source', 'value'),
+     State('master-store', 'data')],
+     prevent_initial_call=False
 )
 def update_all_options(dataset_sel, analysis_type, data1, data2, data_source, master_store):
     """Met à jour toutes les options des composants selon le dataset sélectionné"""
     
     # Sélectionner le dataset approprié
     data = get_dataset(dataset_sel, data1, data2, master_store, data_source)
-    # if data_source == 'master':
-    #     data = master_store
-    # else:
-    #     data = data1 if dataset_sel == 'dataset1' else data2
     
     if not data:
         return [], None, [], None, [], None, [], []
@@ -3556,7 +3555,7 @@ def update_overlay_count(session, sex_filter, selected_groups, selected_subject,
     """Compte les sujets d'overlay"""
     
     # Sélectionner le dataset approprié
-    data = get_dataset(data1, data2, master_store, data_source) #dataset_sel,
+    data = get_dataset(dataset_sel, data1, data2, master_store, data_source) 
     # if data_source == 'master':
     #     data = master_store
     # else:

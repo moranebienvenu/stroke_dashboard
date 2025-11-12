@@ -495,10 +495,10 @@ def api_generate_correlation_heatmaps():
         # Sélectionner les données
         if dataset == 'master':
             data = _global_data['master_data']
-        # elif dataset == 'dataset1':
-        #     data = _global_data['dataset1']
-        # elif dataset == 'dataset2':
-        #     data = _global_data['dataset2']
+        elif dataset == 'dataset1':
+            data = _global_data['dataset1']
+        elif dataset == 'dataset2':
+            data = _global_data['dataset2']
         
         if not data:
             return jsonify({"error": f"Dataset {dataset} not available"}), 404
@@ -729,10 +729,10 @@ def api_generate_cross_correlation_heatmaps():
         # Sélectionner les données
         if dataset == 'master':
             data = _global_data['master_data']
-        # elif dataset == 'dataset1':
-        #     data = _global_data['dataset1']
-        # elif dataset == 'dataset2':
-        #     data = _global_data['dataset2']
+        elif dataset == 'dataset1':
+            data = _global_data['dataset1']
+        elif dataset == 'dataset2':
+            data = _global_data['dataset2']
         
         if not data:
             return jsonify({"error": f"Dataset {dataset} not available"}), 404

@@ -828,7 +828,7 @@ def api_generate_cross_correlation_heatmaps():
         fig.update_layout(
             title=dict(
                 text=f"Cross Correlation: {session1} ({sex_filter1}) vs {session2} ({sex_filter2})",
-                x=0.001,
+                x=0.5,
                 xanchor='center'
             ),
             xaxis=dict(
@@ -3122,12 +3122,12 @@ def toggle_selection_containers(analysis_type):
      Output('group-checklist', 'options'),
      Output('group-checklist', 'value')],
     [Input('dataset-selector', 'value'),
-     Input('analysis-type', 'value')],
-    #  Input('dataset1-store', 'data'), 
-    #  Input('dataset2-store', 'data')],
-    [State('dataset1-store', 'data'),
-     State('dataset2-store', 'data'),
-     State('data-source', 'value'),
+     Input('analysis-type', 'value'),
+     Input('dataset1-store', 'data'), 
+     Input('dataset2-store', 'data')],
+    # [State('dataset1-store', 'data'),
+    #  State('dataset2-store', 'data'),
+     [State('data-source', 'value'),
      State('master-store', 'data')],
      prevent_initial_call=False
 )

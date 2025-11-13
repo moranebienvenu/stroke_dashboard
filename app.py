@@ -118,8 +118,8 @@ def api_generate_plots():
         # Paramètres par défaut
         dataset = params.get('dataset', 'master')
         analysis_type = params.get('analysis_type', 'session_sex')
-        session = params.get('session'), # 'V1')
-        sex_filter = params.get('sex_filter'), # 'men')
+        session = params.get('session',  'V1')
+        sex_filter = params.get('sex_filter', 'men')
         selected_groups = params.get('groups', [])
         selected_subject = params.get('subject', None)
         
@@ -295,8 +295,8 @@ def api_generate_overlay():
         # Paramètres par défaut pour l'état naturel
         dataset = params.get('dataset', 'master')
         analysis_type = params.get('analysis_type', 'session_sex')  # État naturel
-        session = params.get('session'), # 'V1')  # État naturel
-        sex_filter = params.get('sex_filter'), # 'women')  # État naturel
+        session = params.get('session','V1')  # État naturel
+        sex_filter = params.get('sex_filter','women')  # État naturel
         selected_groups = params.get('groups', [])
         selected_subject = params.get('subject', None)
         overlay_title = params.get('title', 'Overlay')
@@ -530,34 +530,34 @@ def api_generate_correlation_heatmaps():
         }
 
         # Dictionnaire pour tronquer les noms
-        short_labels = {
-            "pre_A4B2": "A4B2", "pre_M1": "M1", "pre_D1": "D1", "pre_D2": "D2",
-            "pre_5HT1a": "5HT1a", "pre_5HT1b": "5HT1b", "pre_5HT2a": "5HT2a",
-            "pre_5HT4": "5HT4", "pre_5HT6": "5HT6",
-            "post_VAChT": "VAChT", "post_DAT": "DAT", "post_5HTT": "5HTT",
-            "loc_inj_GABAa": "GABAa", "loc_inj_mGluR5": "mGluR5", "loc_inj_MU": "MU",
-            "loc_inj_H3": "H3", "loc_inj_CB1": "CB1", "loc_inj_A4B2": "A4B2",
-            "loc_inj_M1": "M1", "loc_inj_VAChT": "VAChT", "loc_inj_D1": "D1",
-            "loc_inj_D2": "D2", "loc_inj_DAT": "DAT", "loc_inj_Nor": "Nor",
-            "loc_inj_5HT1a": "5HT1a", "loc_inj_5HT1b": "5HT1b", "loc_inj_5HT2a": "5HT2a",
-            "loc_inj_5HT4": "5HT4", "loc_inj_5HT6": "5HT6", "loc_inj_5HTT": "5HTT",
-            "tract_inj_GABAa": "GABAa", "tract_inj_mGluR5": "mGluR5", "tract_inj_MU": "MU",
-            "tract_inj_H3": "H3", "tract_inj_CB1": "CB1", "tract_inj_A4B2": "A4B2",
-            "tract_inj_M1": "M1", "tract_inj_VAChT": "VAChT", "tract_inj_D1": "D1",
-            "tract_inj_D2": "D2", "tract_inj_DAT": "DAT", "tract_inj_Nor": "Nor",
-            "tract_inj_5HT1a": "5HT1a", "tract_inj_5HT1b": "5HT1b", "tract_inj_5HT2a": "5HT2a",
-            "tract_inj_5HT4": "5HT4", "tract_inj_5HT6": "5HT6", "tract_inj_5HTT": "5HTT"
-        }
+        # short_labels = {
+        #     "pre_A4B2": "A4B2", "pre_M1": "M1", "pre_D1": "D1", "pre_D2": "D2",
+        #     "pre_5HT1a": "5HT1a", "pre_5HT1b": "5HT1b", "pre_5HT2a": "5HT2a",
+        #     "pre_5HT4": "5HT4", "pre_5HT6": "5HT6",
+        #     "post_VAChT": "VAChT", "post_DAT": "DAT", "post_5HTT": "5HTT",
+        #     "loc_inj_GABAa": "GABAa", "loc_inj_mGluR5": "mGluR5", "loc_inj_MU": "MU",
+        #     "loc_inj_H3": "H3", "loc_inj_CB1": "CB1", "loc_inj_A4B2": "A4B2",
+        #     "loc_inj_M1": "M1", "loc_inj_VAChT": "VAChT", "loc_inj_D1": "D1",
+        #     "loc_inj_D2": "D2", "loc_inj_DAT": "DAT", "loc_inj_Nor": "Nor",
+        #     "loc_inj_5HT1a": "5HT1a", "loc_inj_5HT1b": "5HT1b", "loc_inj_5HT2a": "5HT2a",
+        #     "loc_inj_5HT4": "5HT4", "loc_inj_5HT6": "5HT6", "loc_inj_5HTT": "5HTT",
+        #     "tract_inj_GABAa": "GABAa", "tract_inj_mGluR5": "mGluR5", "tract_inj_MU": "MU",
+        #     "tract_inj_H3": "H3", "tract_inj_CB1": "CB1", "tract_inj_A4B2": "A4B2",
+        #     "tract_inj_M1": "M1", "tract_inj_VAChT": "VAChT", "tract_inj_D1": "D1",
+        #     "tract_inj_D2": "D2", "tract_inj_DAT": "DAT", "tract_inj_Nor": "Nor",
+        #     "tract_inj_5HT1a": "5HT1a", "tract_inj_5HT1b": "5HT1b", "tract_inj_5HT2a": "5HT2a",
+        #     "tract_inj_5HT4": "5HT4", "tract_inj_5HT6": "5HT6", "tract_inj_5HTT": "5HTT"
+        # }
         
         available_vars = [col for col in outcome_vars_map.get(system_type, []) if col in df.columns]
         if not available_vars:
             return jsonify({"error": f"No variables found for {system_type}"}), 404
        
 
-        if system_type != "Clinical Outcomes":
-            display_vars = [short_labels.get(var, var) for var in available_vars]
-        else : 
-            display_vars = available_vars
+        # if system_type != "Clinical Outcomes":
+        #     display_vars = [short_labels.get(var, var) for var in available_vars]
+        # else : 
+        #     display_vars = available_vars
         
         
         
@@ -595,7 +595,7 @@ def api_generate_correlation_heatmaps():
             corr_matrix, pval_matrix = get_correlation_matrix(df_numeric, include_sex_bin=False)
             
             # Créer la heatmap avec la même logique que le callback Dash
-            fig = create_dash_style_heatmap(corr_matrix, pval_matrix, f"Session {session} - {sex_filter.title()}", display_vars=display_vars)
+            fig = create_dash_style_heatmap(corr_matrix, pval_matrix, f"Session {session} - {sex_filter.title()}") #, display_vars=display_vars)
             
             heatmaps_data[sex_filter] = {
                 "status": "success",
@@ -625,26 +625,26 @@ def api_generate_correlation_heatmaps():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def create_dash_style_heatmap(corr_matrix, pval_matrix, title, display_vars=None):
+def create_dash_style_heatmap(corr_matrix, pval_matrix, title): #, display_vars=None):
     """Crée une heatmap identique à celle du Dashboard"""
     # Préparer les données comme dans le callback Dash
     mask = pval_matrix > 0.05
     corr_display = corr_matrix.where(~mask, None)
 
     # Utiliser les noms d'affichage (tronqués) 
-    if display_vars and len(display_vars) == len(corr_display.columns):
-        x_labels = display_vars
-        y_labels = display_vars
-    else:
-        x_labels = corr_display.columns.tolist()
-        y_labels = corr_display.index.tolist()
+    # if display_vars and len(display_vars) == len(corr_display.columns):
+    #     x_labels = display_vars
+    #     y_labels = display_vars
+    # else:
+    #     x_labels = corr_display.columns.tolist()
+    #     y_labels = corr_display.index.tolist()
     
     
     # Créer la heatmap avec les mêmes paramètres 
     fig = go.Figure(data=go.Heatmap(
         z=corr_display.values,
-        x=x_labels, #corr_display.columns.tolist(),
-        y=y_labels, #corr_display.index.tolist(),
+        x=corr_display.columns.tolist(), #,x_labels
+        y=corr_display.index.tolist(), #y_labels,
         colorscale='RdBu_r',
         zmin=-1,
         zmax=1,
@@ -704,9 +704,9 @@ def create_dash_style_heatmap(corr_matrix, pval_matrix, title, display_vars=None
     
     return fig
 
+
+
 #Tests correlation deux sets 
-
-
 @server.route('/api/correlation/generate_cross_heatmaps', methods=['POST'])
 def api_generate_cross_correlation_heatmaps():
     """Génère des heatmaps de corrélation croisée entre deux sets de sujets"""

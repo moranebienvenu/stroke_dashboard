@@ -829,18 +829,20 @@ def api_generate_cross_correlation_heatmaps():
             title=dict(
                 text=f"Cross Correlation: {session1} ({sex_filter1}) vs {session2} ({sex_filter2})",
                 x=0.5,
-                xanchor='center'
+                xanchor='center',
             ),
             xaxis=dict(
                 title=f"Set 2: {outcome2} ({session2})",
                 tickangle=45,
                 tickfont=dict(size=10)
             ),
+            side='bottom', 
             yaxis=dict(
                 title=f"Set 1: {outcome1} ({session1})",
                 autorange='reversed',
                 tickfont=dict(size=10)
             ),
+            
             height=250,
             width=250,
             #margin=dict(l=120, r=50, t=100, b=120)
@@ -2055,17 +2057,6 @@ app.layout = dbc.Container([
 
     # ==================== HEADER ======================================
     html.Div([
-        # dbc.Row([
-        #     dbc.Col([
-        #         html.H1("🧠 Neurotransmitter Balance & Outcomes", 
-        #             className="text-center mb-3",
-        #             style={'color': '#e6f8ec', 'font-weight': '600'}),
-        #         html.H4("Explore neurotransmitter ratios and their clinical relevance", 
-        #             className="text-center",
-        #             style={'color': '#c8e6c9', 'font-weight': '400'})
-        #     ], width=12)
-        # ], className="p-4 mb-4 rounded", 
-        # style={'background-color': '#9caf88', 'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.08)'})
         html.Div([
             dbc.Col([
                 html.H1("🧠 Neurotransmitter Balance & Outcomes", 
@@ -2084,7 +2075,21 @@ app.layout = dbc.Container([
     html.H3("📦 Data Upload"),
     html.P(
         [
-            "The ZIP file must include the following files:",
+                "The ZIP file must include the following files. ",
+                "The first two file types must be generated using ",
+                html.A(
+                    "NeuroTmap",
+                    href="https://github.com/Pedro-N-Alves/NeuroT-Map",
+                    target="_blank"
+                ),
+                " (see the reference article: Alves, P.N., Nozais, V., Hansen, J.Y. et al., ",
+                html.I("Neurotransmitters’ white matter mapping unveils the neurochemical fingerprints of stroke"),
+                ", Nat Commun 16, 2555 (2025), ",
+                html.A(
+                    "https://doi.org/10.1038/s41467-025-57680-2",
+                    href="https://doi.org/10.1038/s41467-025-57680-2",
+                    target="_blank"
+                ),
             html.Ul([
                 html.Li("One or more output_les_dis_sub-XXX_ses-VX.csv files"),
                 html.Li("One or more output_pre_post_synaptic_ratio_sub-XXX_ses-VX.csv files"),

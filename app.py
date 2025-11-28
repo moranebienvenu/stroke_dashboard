@@ -2015,12 +2015,12 @@ def create_correlation_results(corr_matrix, pval_matrix, vars1, vars2, session1,
     ])
     
     return html.Div([
-        html.H3("🔗 Correlation Analysis Results"),
+        html.H3(" Correlation Analysis Results"),
         html.P(f"Session 1: {session1}, {len(vars1)} variables | Session 2: {session2}, {len(vars2)} variables"),
         html.P(f"Common subjects: {cross_corr.shape[0]}"),
         tabs,
         html.Hr(),
-        html.Button("📥 Download Results", id="download-correlation-btn", className="btn btn-success"),
+        html.Button(" Download Results", id="download-correlation-btn", className="btn btn-success"),
         dcc.Download(id="download-correlation"),
         
         # Stockage des données pour les callbacks interactifs
@@ -4226,7 +4226,7 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
             # Onglets pour résultats et visualisations
             dbc.Tabs([
                 dbc.Tab(
-                    label="📋 Detailed Results",
+                    label=" Detailed Results",
                     children=[
                         dash_table.DataTable(
                             data=results_display.to_dict('records'),
@@ -4254,7 +4254,7 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
                 ),
                 
                 dbc.Tab(
-                    label="📊 Results Visualization", 
+                    label=" Results Visualization", 
                     children=results_viz
                 )
             ])

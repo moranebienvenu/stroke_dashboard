@@ -3824,7 +3824,6 @@ def toggle_stats_containers(active_tab, method):
      Output('glm-session', 'options'),
      Output('glm-sex', 'options'),
      Output('glm-groups', 'options'),
-     Output('glm-groups', 'value'),
      Output('glm-interaction-var', 'options'),
      Output('glm-outcomes', 'options'),
      Output('glm-covariates', 'options'),
@@ -3832,21 +3831,17 @@ def toggle_stats_containers(active_tab, method):
      Output('ttest-group1-session', 'options'),
      Output('ttest-group1-sex', 'options'),
      Output('ttest-group1-groups', 'options'),
-     Output('ttest-group1-groups', 'value'),
      Output('ttest-group2-session', 'options'),
      Output('ttest-group2-sex', 'options'),
      Output('ttest-group2-groups', 'options'),
-     Output('ttest-group2-groups', 'value'),
      Output('ttest-variables', 'options'),
      # Correlation outputs
      Output('corr-session1', 'options'),
      Output('corr-sex1', 'options'),
      Output('corr-groups1', 'options'),
-     Output('corr-groups1', 'value'),
      Output('corr-session2', 'options'),
      Output('corr-sex2', 'options'),
-     Output('corr-groups2', 'options'),
-     Output('corr-groups2', 'value')],
+     Output('corr-groups2', 'options')],
     [Input('stats-method', 'value'),
      Input('tabs', 'active_tab')],
     [State('dataset1-store', 'data'),
@@ -3859,14 +3854,14 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
     # Si on n'est pas dans l'onglet stats, retourner des options vides
     if active_tab != "tab-stats":
         empty_options = []
-        return [empty_options] * 24
+        return [empty_options] * 19
     
     # Utiliser les données disponibles (priorité à master si disponible)
     data = master_store if master_store else (data1 if data1 else data2)
     
     if not data:
         empty_options = []
-        return [empty_options] * 24  # 24 outputs
+        return [empty_options] * 19  # 19 outputs
     
     df = pd.DataFrame(data)
     
@@ -3906,7 +3901,6 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
         session_options,      # glm-session
         sex_options,          # glm-sex
         group_options,        # glm-groups
-        group_values,         # group checklist
         interaction_options,  # glm-interaction-var options
         var_options,          # glm-outcomes options  
         var_options,          # glm-covariates options
@@ -3914,23 +3908,19 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
         session_options,      # ttest-group1-session
         sex_options,          # ttest-group1-sex
         group_options,        # ttest-group1-groups
-        group_values,         # group checklist
         # T-Test Group 2
         session_options,      # ttest-group2-session
         sex_options,          # ttest-group2-sex
         group_options,        # ttest-group2-groups
-        group_values,         # group checklist
         var_options,          # ttest-variables
         # Correlation SET 1
         session_options,      # corr-session1
         sex_options,          # corr-sex1
         group_options,        # corr-groups1
-        group_values,         # group checklist
         # Correlation SET 2  
         session_options,      # corr-session2
         sex_options,          # corr-sex2
         group_options,        # corr-groups2
-        group_values,         # group checklist
     )
 
 #Callback pour compter les sujets GLM

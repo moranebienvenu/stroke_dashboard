@@ -2080,7 +2080,7 @@ app.layout = dbc.Container([
     html.Div([
         html.Div([
             dbc.Col([
-                html.H1("🧠 Neurotransmitter Balance & Outcomes", 
+                html.H1(" Neurotransmitter Balance & Outcomes", 
                     className="custom-title text-center mb-3",
                     style={'color': '#e6f8ec', 'font-weight': '600'}),
                 html.H4("Explore neurotransmitter ratios and their clinical relevance", 
@@ -2093,7 +2093,7 @@ app.layout = dbc.Container([
 
     # ==================== SECTION UPLOAD =============================
     html.Hr(),
-    html.H3("📦 Data Upload"),
+    html.H3(" Data Upload"),
     html.P(
         [
                 "The ZIP file must include the following files. ",

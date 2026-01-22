@@ -4,7 +4,7 @@ The main objective of this app is to allow interactive exploration of PSA patien
 
 This dashboard is designed to visualize and interact with outputs previously generated using [NeuroTmap](https://github.com/Pedro-N-Alves/NeuroT-Map) (Alves, P.N., Nozais, V., Hansen, J.Y. et al., *Neurotransmitters’ white matter mapping unveils the neurochemical fingerprints of stroke*, Nat Commun 16, 2555 (2025), [https://doi.org/10.1038/s41467-025-57680-2](https://doi.org/10.1038/s41467-025-57680-2)).
 
-It allows users to explore the data interactively, modify filters, and examine the relationships between different metrics at the subject or group level for big dataset. It allows add the possibility to run statistical analysis such as GLM, T-test or correlation. 
+It enables users to interactively explore the data, apply filters, and examine relationships between metrics at both the subject and group level for large datasets. Users can also perform statistical analyses, including GLM, t-tests, and correlations.
 
 ---
 
@@ -35,7 +35,7 @@ The dashboard requires the following files:
 - Additional columns (optional): `sex`, `timepoint`, `repetition_score`, `comprehension_score`, `naming_score`, `composite_score`, `lesion_volume`.  
 - **Lesion volume must be in mm³.**
 
-You can try the example dataset first to use the dashboard without personal datas: [synthetic_dataset.zip](https://github.com/moranebienvenu/stroke_dashboard).
+You can start by using the example dataset to explore the dashboard without personal data: `synthetic_dataset.zip`.
 
 ---
 
@@ -55,6 +55,6 @@ python app.py
 
 ## About
 
-This dashboard is also the data source for a MyST interconnected article, a next-generation open science publication (“wired-article”) soon available on [Evidence](https://evidencepub.io/). Here is a preview link now available of the article: [Sex-specific early neurotransmitter dynamics and post-stroke aphasia recovery](https://preview.neurolibre.org/myst/moranebienvenu/stroke_article/e0ea9d330c2d6aebf81ec6a435108ae4c050a4db/_build/html/index.html).
+This dashboard also serves as the data source for a MyST interconnected article, a next-generation open science publication (***wired-article***) soon to be available on [Evidence](https://evidencepub.io/). A preview of the article [Sex-specific early neurotransmitter dynamics and post-stroke aphasia recovery](https://preview.neurolibre.org/myst/moranebienvenu/stroke_article/e0ea9d330c2d6aebf81ec6a435108ae4c050a4db/_build/html/index.html), is available here.
 
 It exemplifies how interactive dashboards can fully connect datasets, code, and figures within scientific publications, enabling reproducible and transparent neuroscience research. The next step toward truly FAIR neuroscience publications. 

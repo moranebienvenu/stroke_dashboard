@@ -3,7 +3,7 @@ dash-bootstrap-components
 flask
 plotly
 pandas
-numpy
+numpy == 2.3.4 # new version with "copy-on-write" induces bug
 scipy
 statsmodels
 gunicorn

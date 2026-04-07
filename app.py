@@ -829,21 +829,18 @@ def api_generate_cross_correlation_heatmaps():
             title=dict(
                 text=f"Cross Correlation: {session1} ({sex_filter1}) vs {session2} ({sex_filter2})",
                 x=0.5,
-                xanchor='center',
+                xanchor='center'
             ),
             xaxis=dict(
                 title=f"Set 2: {outcome2} ({session2})",
                 tickangle=45,
-                tickfont=dict(size=10),
-                side='bottom'
+                tickfont=dict(size=10)
             ),
-            #side='bottom', 
             yaxis=dict(
                 title=f"Set 1: {outcome1} ({session1})",
                 autorange='reversed',
                 tickfont=dict(size=10)
             ),
-            
             height=250,
             width=250,
             #margin=dict(l=120, r=50, t=100, b=120)
@@ -915,86 +912,63 @@ def process_zip_to_dataframe(contents, filename):
             ):
                 continue
 
-            # ------------------ Clinical data ------------------
-            if "clinical_data" in filename and (filename.endswith(".csv") or filename.endswith(".xlsx")):
-                with z.open(filename) as f:
-                    try:
-                        # CSV
-                        if filename.endswith(".csv"):
-                            # Try common separators
-                            for sep in [',', ';', '\t', ' ']:
-                                try:
-                                    df_clinical = pd.read_csv(f, sep=sep)
-                                    if 'subject' in df_clinical.columns:
-                                        break
-                                    f.seek(0)  # reset file pointer for next read attempt
-                                except Exception:
-                                    f.seek(0)
-                                    continue
-                            if df_clinical is None:
-                                raise ValueError("Cannot read clinical CSV with common separators")
-                        # Excel
-                        else:
-                            df_clinical = pd.read_excel(f, engine='openpyxl')
+            if filename.endswith(".csv") or filename.endswith(".xlsx"):
+                # Clinical data file
+                if "clinical_data" in filename:
+                    with z.open(filename) as f:
+                        try:
+                            if filename.endswith(".csv"):
+                                content = f.read().decode("utf-8")
+                                if "," in content and " " in content:
+                                    df_clinical = pd.read_csv(io.StringIO(content), sep=" ", decimal=",")
+                                else:
+                                    df_clinical = pd.read_csv(io.StringIO(content))
+                            else:
+                                df_clinical = pd.read_excel(f, engine="openpyxl")
+                        except Exception as e:
+                            print(f"Error loading clinical file: {e}")
+                    continue  
 
-                        # Convert numeric columns with commas to floats
-                        for col in df_clinical.columns:
-                            if df_clinical[col].dtype == object:
-                                df_clinical[col] = df_clinical[col].astype(str).str.replace(',', '.')
-                                try:
-                                    df_clinical[col] = df_clinical[col].astype(float)
-                                except:
-                                    pass
-
-                        # Ensure 'subject' column exists
-                        if 'subject' not in df_clinical.columns:
-                            raise ValueError("No 'subject' column found in clinical data")
-
-                        df_clinical = df_clinical.reset_index(drop=True)
-                    except Exception as e:
-                        print(f"Error reading clinical file {filename}: {e}")
-                        df_clinical = None
-                continue  # skip to next file
-
-            # ------------------ Other CSV files ------------------
+            # Extract subject ID
             if "output_les_dis" in filename or "output_pre_post_synaptic_ratio" in filename:
                 match = re.search(r"sub-[A-Za-z0-9]+_ses-V[0-9]+", filename)
                 if not match:
                     continue
-                subject = match.group(0)
 
-                with z.open(filename) as f:
-                    try:
-                        df = pd.read_csv(f, sep=' ', index_col=0)
-                    except Exception:
-                        continue
+            subject = match.group(0)
 
-                # Classify by type
-                if "output_les_dis" in filename:
-                    row = {"subject": subject}
-                    if not systems_list and len(df.columns) > 0:
-                        systems_list = list(df.columns)
-                    for idx in df.index:
-                        prefix = str(idx).split('_sub-')[0]
-                        for system in df.columns:
-                            colname = f"{prefix}_{system}"
-                            row[colname] = df.at[idx, system]
-                    data_les_dis[subject] = pd.DataFrame([row])  
+            with z.open(filename) as f:
+                try:
+                    df = pd.read_csv(f, sep=' ', index_col=0)
+                except Exception as e:
+                    continue
 
-                elif "output_pre_post_synaptic_ratio" in filename:
-                    row = {"subject": subject}
-                    for col in df.columns:
-                        m = re.match(r"(.+?)\s+(presynaptic|postsynaptic)", col)
-                        if m:
-                            system_name = m.group(1).strip()
-                            syn_type = m.group(2).strip()
-                            prefix = "pre" if syn_type == "presynaptic" else "post"
-                            new_colname = f"{prefix}_{system_name}"
-                            val = df[col].iloc[0] if not df.empty else None
-                            row[new_colname] = val
-                    data_pre_post[subject] = pd.DataFrame([row])
+            # Classify by type
+            if "output_les_dis" in filename:
+                row = {"subject": subject}
+                if not systems_list and len(df.columns) > 0:
+                    systems_list = list(df.columns)
+                for idx in df.index:
+                    prefix = str(idx).split('_sub-')[0]
+                    for system in df.columns:
+                        colname = f"{prefix}_{system}"
+                        row[colname] = df.at[idx, system]
+                data_les_dis[subject] = pd.DataFrame([row])  
 
-    # ------------------ Merge ------------------
+            elif "output_pre_post_synaptic_ratio" in filename:
+                row = {"subject": subject}
+                for col in df.columns:
+                    m = re.match(r"(.+?)\s+(presynaptic|postsynaptic)", col)
+                    if m:
+                        system_name = m.group(1).strip()
+                        syn_type = m.group(2).strip()
+                        prefix = "pre" if syn_type == "presynaptic" else "post"
+                        new_colname = f"{prefix}_{system_name}"
+                        val = df[col].iloc[0] if not df.empty else None
+                        row[new_colname] = val
+                data_pre_post[subject] = pd.DataFrame([row])
+
+    # Merge subject by subject
     combined_rows = []
     all_subjects = set(data_les_dis.keys()) | set(data_pre_post.keys()) 
 
@@ -1004,13 +978,13 @@ def process_zip_to_dataframe(contents, filename):
         if subject in data_les_dis:
             try:
                 row.update(data_les_dis[subject].iloc[0].to_dict())
-            except Exception:
+            except Exception as e:
                 pass
 
         if subject in data_pre_post:
             try:
                 row.update(data_pre_post[subject].iloc[0].to_dict())
-            except Exception:
+            except Exception as e:
                 pass
 
         # Add clinical data if available
@@ -1029,6 +1003,7 @@ def process_zip_to_dataframe(contents, filename):
     # Reorganize columns for logical order
     if systems_list:
         ordered_columns = ['subject']
+        
         for system in systems_list:
             for measure in ['loc_inj', 'loc_inj_perc', 'tract_inj', 'tract_inj_perc']:
                 colname = f"{measure}_{system}"
@@ -1045,28 +1020,30 @@ def process_zip_to_dataframe(contents, filename):
 
     return final_df
 
-
 def detect_group(subject_id):
-    """Detect subject group from ID with regex for exact matching"""
-    patterns = [
-        (r'sub-TCMix\d', 'TCMix'),
-        (r'sub-TCM\d', 'TCM'),
-        (r'sub-TCS\d', 'TCS'),
-        (r'sub-NA\d', 'NA'),
-        (r'sub-AN\d', 'AN'),
-        (r'sub-A\d', 'A'),
-        (r'sub-C\d', 'C'),
-        (r'sub-B\d', 'B'),
-        (r'sub-W\d', 'W'),
-        (r'sub-G\d', 'G'),
-    ]
-    
-    for pattern, group in patterns:
-        if re.search(pattern, subject_id):
-            return group
-    
-    return "Unknown"
-    
+    """Detect subject group from ID"""
+    if "_sub-NA" in subject_id or "-NA" in subject_id:
+        return "NA"
+    elif "_sub-AN" in subject_id or "-AN" in subject_id: 
+        return "AN"
+    elif "_sub-A" in subject_id or "-A" in subject_id:
+        return "A"
+    elif "_sub-C" in subject_id or "-C" in subject_id: 
+        return "C"
+    elif "_sub-B" in subject_id or "-B" in subject_id: 
+        return "B"
+    elif "_sub-W" in subject_id or "-W" in subject_id: 
+        return "W"
+    elif "_sub-G" in subject_id or "-G" in subject_id: 
+        return "G"
+    elif "_sub-TCM" in subject_id or "-TCM" in subject_id: 
+        return "TCM"
+    elif "_sub-TCS" in subject_id or "-TCS" in subject_id: 
+        return "TCS"
+    elif "_sub-TCMix" in subject_id or "-TCMix" in subject_id: 
+        return "TCMix"
+    else:
+        return "Unknown"
 
 def create_interactive_plots(df, subjects, title_suffix="", is_group=False, is_overlay=False):
     # Filtrer les données et calculer les moyennes que si groupe sinon mettre les données individuelles pour chaque sujet base/overlay
@@ -2016,12 +1993,12 @@ def create_correlation_results(corr_matrix, pval_matrix, vars1, vars2, session1,
     ])
     
     return html.Div([
-        html.H3(" Correlation Analysis Results"),
+        html.H3("🔗 Correlation Analysis Results"),
         html.P(f"Session 1: {session1}, {len(vars1)} variables | Session 2: {session2}, {len(vars2)} variables"),
         html.P(f"Common subjects: {cross_corr.shape[0]}"),
         tabs,
         html.Hr(),
-        html.Button(" Download Results", id="download-correlation-btn", className="btn btn-success"),
+        html.Button("📥 Download Results", id="download-correlation-btn", className="btn btn-success"),
         dcc.Download(id="download-correlation"),
         
         # Stockage des données pour les callbacks interactifs
@@ -2062,7 +2039,6 @@ app.layout = dbc.Container([
         'current_groups': []
     }),
     dcc.Store(id='master-store'),
-    dcc.Store(id='ttest-results-store', data=None),
     #dcc.Store(id='ttest-cleaned-data-store', data=None),
 
     # ==================== SOURCE DE DONNÉES ===========================
@@ -2079,9 +2055,20 @@ app.layout = dbc.Container([
 
     # ==================== HEADER ======================================
     html.Div([
+        # dbc.Row([
+        #     dbc.Col([
+        #         html.H1("🧠 Neurotransmitter Balance & Outcomes", 
+        #             className="text-center mb-3",
+        #             style={'color': '#e6f8ec', 'font-weight': '600'}),
+        #         html.H4("Explore neurotransmitter ratios and their clinical relevance", 
+        #             className="text-center",
+        #             style={'color': '#c8e6c9', 'font-weight': '400'})
+        #     ], width=12)
+        # ], className="p-4 mb-4 rounded", 
+        # style={'background-color': '#9caf88', 'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.08)'})
         html.Div([
             dbc.Col([
-                html.H1(" Neurotransmitter Balance & Outcomes", 
+                html.H1("🧠 Neurotransmitter Balance & Outcomes", 
                     className="custom-title text-center mb-3",
                     style={'color': '#e6f8ec', 'font-weight': '600'}),
                 html.H4("Explore neurotransmitter ratios and their clinical relevance", 
@@ -2094,24 +2081,10 @@ app.layout = dbc.Container([
 
     # ==================== SECTION UPLOAD =============================
     html.Hr(),
-    html.H3(" Data Upload"),
+    html.H3("📦 Data Upload"),
     html.P(
         [
-                "The ZIP file must include the following files. ",
-                "The first two file types must be generated using ",
-                html.A(
-                    "NeuroTmap",
-                    href="https://github.com/Pedro-N-Alves/NeuroT-Map",
-                    target="_blank"
-                ),
-                " (see the reference article: Alves, P.N., Nozais, V., Hansen, J.Y. et al., ",
-                html.I("Neurotransmitters’ white matter mapping unveils the neurochemical fingerprints of stroke"),
-                ", Nat Commun 16, 2555 (2025), ",
-                html.A(
-                    "https://doi.org/10.1038/s41467-025-57680-2",
-                    href="https://doi.org/10.1038/s41467-025-57680-2",
-                    target="_blank"
-                ),
+            "The ZIP file must include the following files:",
             html.Ul([
                 html.Li("One or more output_les_dis_sub-XXX_ses-VX.csv files"),
                 html.Li("One or more output_pre_post_synaptic_ratio_sub-XXX_ses-VX.csv files"),
@@ -2204,7 +2177,7 @@ app.layout = dbc.Container([
     html.Div(id="main-configuration-container", children=[ 
     
         html.Hr(),
-        html.H3(" Profile Configuration"),
+        html.H3("📊 Profile Configuration"),
         
         # Sélecteurs principaux (dataset et type d'analyse)
         dbc.Row([
@@ -2491,7 +2464,7 @@ app.layout = dbc.Container([
                 options=[
                     {'label': 'Dataset 1', 'value': 'dataset1'},
                     {'label': 'Dataset 2', 'value': 'dataset2'},
-                    #{'label': 'Both Datasets', 'value': 'both'}
+                    {'label': 'Both Datasets', 'value': 'both'}
                 ],
                 value='dataset1',
                 inline=True,
@@ -2505,7 +2478,7 @@ app.layout = dbc.Container([
                 id='stats-analysis-type',
                 options=[
                     {'label': 'By session and sex', 'value': 'session_sex'},
-                    #{'label': 'Personalized subject list', 'value': 'personalized'}
+                    {'label': 'Personalized subject list', 'value': 'personalized'}
                 ],
                 value='session_sex',
                 inline=True, 
@@ -2703,19 +2676,19 @@ app.layout = dbc.Container([
                             inline=True
                         )
                     ], width=6),
-                    # dbc.Col([
-                    #     dbc.Label("Dataset for Analysis"),
-                    #     dcc.RadioItems(
-                    #         id='ttest-dataset',
-                    #         options=[
-                    #             {'label': 'Dataset 1', 'value': 'dataset1'},
-                    #             {'label': 'Dataset 2', 'value': 'dataset2'},
-                    #             {'label': 'Master', 'value': 'master-store'}
-                    #         ],
-                    #         value='dataset1',
-                    #         inline=True
-                    #     )
-                    # ], width=6)
+                    dbc.Col([
+                        dbc.Label("Dataset for Analysis"),
+                        dcc.RadioItems(
+                            id='ttest-dataset',
+                            options=[
+                                {'label': 'Dataset 1', 'value': 'dataset1'},
+                                {'label': 'Dataset 2', 'value': 'dataset2'},
+                                {'label': 'Master', 'value': 'master-store'}
+                            ],
+                            value='dataset1',
+                            inline=True
+                        )
+                    ], width=6)
                 ])
             ])
         ], className="mb-4"),
@@ -3883,7 +3856,6 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
     all_subjects = df['subject'].unique()
     all_groups = sorted({detect_group(subj) for subj in all_subjects})
     group_options = [{'label': group, 'value': group} for group in all_groups if group != 'Unknown']
-    group_values = [group['value'] for group in group_options] 
     
     # Variables pour GLM et T-Test
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -3921,7 +3893,7 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
         # Correlation SET 2  
         session_options,      # corr-session2
         sex_options,          # corr-sex2
-        group_options,        # corr-groups2
+        group_options         # corr-groups2
     )
 
 #Callback pour compter les sujets GLM
@@ -3982,8 +3954,7 @@ def update_glm_subject_count(session, sex_filter, groups, dataset, data1, data2,
      Input('ttest-group2-session', 'value'),
      Input('ttest-group2-sex', 'value'),
      Input('ttest-group2-groups', 'value'),
-     Input('stats-dataset', 'value')],
-     #Input('ttest-dataset', 'value')],
+     Input('ttest-dataset', 'value')],
     [State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')]
@@ -4227,7 +4198,7 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
             # Onglets pour résultats et visualisations
             dbc.Tabs([
                 dbc.Tab(
-                    label=" Detailed Results",
+                    label="📋 Detailed Results",
                     children=[
                         dash_table.DataTable(
                             data=results_display.to_dict('records'),
@@ -4255,7 +4226,7 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
                 ),
                 
                 dbc.Tab(
-                    label=" Results Visualization", 
+                    label="📊 Results Visualization", 
                     children=results_viz
                 )
             ])
@@ -4440,12 +4411,10 @@ def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter
 # Callback pour exécuter l'analyse T-Test et afficher les résultats
 @app.callback(
     [Output('ttest-results-container', 'children'),
-     Output('ttest-results-store', 'data')],
-    # Output('ttest-cleaned-data-store', 'data')],
+    Output('ttest-cleaned-data-store', 'data')],
     [Input('run-ttest-analysis', 'n_clicks'),
      Input('ttest-type', 'value'),
-     Input('stats-dataset', 'value')],
-     #Input('ttest-dataset', 'value')],
+     Input('ttest-dataset', 'value')],
     [State('ttest-group1-session', 'value'),
      State('ttest-group1-sex', 'value'),
      State('ttest-group1-groups', 'value'),
@@ -4453,7 +4422,6 @@ def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter
      State('ttest-group2-sex', 'value'),
      State('ttest-group2-groups', 'value'),
      State('ttest-variables', 'value'),
-     State('stats-dataset', 'value'),
      State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')]
@@ -4461,16 +4429,18 @@ def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter
 def run_ttest_analysis(n_clicks, test_type, dataset, 
                       g1_session, g1_sex, g1_groups, 
                       g2_session, g2_sex, g2_groups, 
-                      variables, dataset_sel, data1, data2, master_store):
+                      variables, data1, data2, master_store):
     """Exécute l'analyse T-Test et retourne les résultats"""
     
     if n_clicks is None or n_clicks == 0:
-        return html.Div("Configure the parameters and click on ‘Run T-Test Analysis’."), None
+        return html.Div("Configurez les paramètres et cliquez sur 'Run T-Test Analysis'"), None
     
     # Validation des paramètres
     if not all([g1_session, g2_session]):
-        return dbc.Alert("Please select a session for both groups.", color="warning"), None
+        return dbc.Alert("Veuillez sélectionner une session pour les deux groupes", color="warning"), None
     
+    if not variables:
+        return dbc.Alert("Veuillez sélectionner au moins une variable à comparer", color="warning"), None
     
     # Sélectionner les données
     if dataset == 'master-store':
@@ -4481,12 +4451,9 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
         data = data2
     
     if not data:
-        return dbc.Alert("No data available for the analysis", color="danger"), None
-
+        return dbc.Alert("Aucune donnée disponible pour l'analyse", color="danger"), None
+    
     df = pd.DataFrame(data)
-
-    if not variables:
-        return dbc.Alert("Please select at least one variable to compare.", color="warning"), None
     
     # Fonction pour obtenir les sujets d'un groupe
     def get_group_subjects(session, sex_filter, groups):
@@ -4511,7 +4478,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
     g2_subjects = get_group_subjects(g2_session, g2_sex, g2_groups)
     
     if len(g1_subjects) < 3 or len(g2_subjects) < 3:
-        return dbc.Alert(f"Groups too small: Group 1={len(g1_subjects)}, Group 2={len(g2_subjects)} (minimum 3 required)", color="warning"), None
+        return dbc.Alert(f"Groupes trop petits: Groupe 1={len(g1_subjects)}, Groupe 2={len(g2_subjects)} (minimum 3 requis)", color="warning"), None
     
     # Vérification pour test apparié
     paired = (test_type == 'paired')
@@ -4522,14 +4489,14 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
         common_base_ids = g1_base_ids & g2_base_ids
         
         if not common_base_ids:
-            return dbc.Alert("No common subjects found for the paired test.", color="warning"), None
+            return dbc.Alert("Aucun sujet commun trouvé pour le test apparié", color="warning"), None
         
         # Filtrer pour ne garder que les paires valides
         g1_subjects = [subj for subj in g1_subjects if subj.split('-V')[0] in common_base_ids]
         g2_subjects = [subj for subj in g2_subjects if subj.split('-V')[0] in common_base_ids]
         
         if len(common_base_ids) < 3:
-            return dbc.Alert(f"Only {len(common_base_ids)} valid pairs found (minimum 3 required).", color="warning"), None
+            return dbc.Alert(f"Seulement {len(common_base_ids)} paires valides trouvées (minimum 3 requis)", color="warning"), None
     
     # Préparer les données
     df_g1 = df[df['subject'].isin(g1_subjects)]
@@ -4575,35 +4542,17 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                 # valid_variables.append(var)
     
     if not results:
-        return dbc.Alert("No valid analysis could be performed.", color="warning"), None
+        return dbc.Alert("Aucune analyse valide n'a pu être effectuée", color="warning"), None
     
     # Créer le DataFrame des résultats
     results_df = pd.DataFrame(results)
-
-    # ========== STOCKAGE DES RÉSULTATS POUR LE TÉLÉCHARGEMENT ==========
-    results_store = {
-        'results_df': results_df.to_dict('records'),
-        'test_type': test_type,
-        'group1_info': {
-            'session': g1_session,
-            'sex': g1_sex,
-            'groups': g1_groups,
-            'n_subjects': len(g1_subjects)
-        },
-        'group2_info': {
-            'session': g2_session,
-            'sex': g2_sex,
-            'groups': g2_groups,
-            'n_subjects': len(g2_subjects)
-        }
-    }
     
     # Interface avec onglets
     tabs = dbc.Tabs([
         # Onglet 1: Résultats statistiques
         dbc.Tab(
             dbc.Card([
-                dbc.CardHeader("Statistical Results"),
+                dbc.CardHeader("Résultats Statistiques"),
                 dbc.CardBody([
                     html.Div([
                         dash_table.DataTable(
@@ -4612,9 +4561,9 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                                 {"name": "Variable", "id": "variable"},
                                 {"name": "Test", "id": "test_type"},
                                 {"name": "p-value", "id": "p_value", "type": "numeric", "format": {"specifier": ".4f"}},
-                                {"name": "Significant", "id": "significant"},
-                                {"name": "Mean G1", "id": "mean_group1", "type": "numeric", "format": {"specifier": ".3f"}},
-                                {"name": "Mean G2", "id": "mean_group2", "type": "numeric", "format": {"specifier": ".3f"}},
+                                {"name": "Significatif", "id": "significant"},
+                                {"name": "Moyenne G1", "id": "mean_group1", "type": "numeric", "format": {"specifier": ".3f"}},
+                                {"name": "Moyenne G2", "id": "mean_group2", "type": "numeric", "format": {"specifier": ".3f"}},
                                 {"name": "Effect Size", "id": "effect_size", "type": "numeric", "format": {"specifier": ".3f"}},
                                 {"name": "N G1", "id": "n_group1"},
                                 {"name": "N G2", "id": "n_group2"}
@@ -4636,7 +4585,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                     ]),
                     html.Hr(),
                     html.Div([
-                        dbc.Button("Download Excel Results", 
+                        dbc.Button("Télécharger les résultats Excel", 
                                  id="download-ttest-results", 
                                  color="success", 
                                  className="me-2"),
@@ -4644,17 +4593,17 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                     ])
                 ])
             ]),
-            label="Statistical Results"
+            label="Résultats Statistiques"
         ),
         
         # Onglet 2: Visualisation
         dbc.Tab(
             dbc.Card([
-                dbc.CardHeader("Results Visualization"),
+                dbc.CardHeader("Visualisation des Résultats"),
                 dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
-                            dbc.Label("Chart Type"),
+                            dbc.Label("Type de graphique"),
                             dbc.RadioItems(
                                 id='ttest-plot-type',
                                 options=[
@@ -4666,7 +4615,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                             )
                         ], width=6),
                         dbc.Col([
-                            dbc.Label("Variable to Visualize"),
+                            dbc.Label("Variable à visualiser"),
                             dcc.Dropdown(
                                 id='ttest-plot-variable',
                                 options=[{'label': v, 'value': v} for v in valid_variables],
@@ -4677,11 +4626,11 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                     html.Div(id='ttest-plot-container')
                 ])
             ]),
-            label="Visualization"
+            label="Visualisation"
         )
     ])
     
-    return tabs, results_store
+    return tabs, cleaned_data_dict
 
 # Callback pour mettre à jour le dropdown des variables
 @app.callback(
@@ -4779,72 +4728,15 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
 @app.callback(
     Output("download-ttest", "data"),
     Input("download-ttest-results", "n_clicks"),
-    State("ttest-results-store", "data"),
     prevent_initial_call=True
 )
-def download_ttest_results(n_clicks, stored_results):
+def download_ttest_results(n_clicks):
     """Télécharge les résultats T-Test en Excel"""
-    if not n_clicks or not stored_results:
-        raise PreventUpdate
+    # Récupérer les résultats depuis le store
+    # results_df = ...
     
-    # Récupérer les résultats
-    results_df = pd.DataFrame(stored_results['results_df'])
-    
-    # Créer un fichier Excel en mémoire avec mise en forme
-    output = io.BytesIO()
-    
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        # Feuille 1 : Résultats statistiques
-        results_df.to_excel(writer, sheet_name='Results', index=False)
-        
-        # Feuille 2 : Informations sur l'analyse
-        info_data = {
-            'Parameter': [
-                'Test Type',
-                'Group 1 Session',
-                'Group 1 Sex',
-                'Group 1 Groups',
-                'Group 1 N',
-                'Group 2 Session',
-                'Group 2 Sex',
-                'Group 2 Groups',
-                'Group 2 N'
-            ],
-            'Value': [
-                stored_results['test_type'],
-                stored_results['group1_info']['session'],
-                stored_results['group1_info']['sex'],
-                ', '.join(stored_results['group1_info']['groups']) if stored_results['group1_info']['groups'] else 'All',
-                stored_results['group1_info']['n_subjects'],
-                stored_results['group2_info']['session'],
-                stored_results['group2_info']['sex'],
-                ', '.join(stored_results['group2_info']['groups']) if stored_results['group2_info']['groups'] else 'All',
-                stored_results['group2_info']['n_subjects']
-            ]
-        }
-        info_df = pd.DataFrame(info_data)
-        info_df.to_excel(writer, sheet_name='Analysis Info', index=False)
-        
-        # Mise en forme
-        workbook = writer.book
-        worksheet = writer.sheets['Results']
-        
-        # Format pour les p-values significatives
-        red_format = workbook.add_format({'bg_color': '#FFE4E1', 'bold': True})
-        
-        # Appliquer le format aux p-values < 0.05
-        for row_num, row_data in enumerate(results_df.to_dict('records'), start=1):
-            if row_data.get('p_value', 1) < 0.05:
-                worksheet.write(row_num, 2, row_data['p_value'], red_format)
-    
-    output.seek(0)
-    
-    # Générer un nom de fichier avec timestamp
-    from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"ttest_results_{timestamp}.xlsx"
-    
-    return dcc.send_bytes(output.getvalue(), filename)
+    # Pour l'instant, retourner un fichier vide
+    return dcc.send_data_frame(pd.DataFrame().to_excel, "ttest_results.xlsx")
 
 #================================= Correlation analyses =================================
 
@@ -4988,7 +4880,7 @@ def run_correlation_analysis(n_clicks, system_type1, system_type2,
             "D1", "D2", "DAT", "Nor", "5HT1a", "5HT1b", "5HT2a", "5HT4", "5HT6", "5HTT"
         ] if f"tract_inj_{sys}" in df.columns],
         "Clinical Outcomes": [col for col in df.columns 
-                    if col not in ['Unknown', 'subject', 'Sexe_bin', 'sex', 'lesion_volume']
+                    if col not in ['subject', 'Sexe_bin', 'sex', 'lesion_volume']
                     and not col.startswith(('loc_inj_', 'tract_inj_', 'pre_', 'post_'))]
     }
     

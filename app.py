@@ -834,9 +834,10 @@ def api_generate_cross_correlation_heatmaps():
             xaxis=dict(
                 title=f"Set 2: {outcome2} ({session2})",
                 tickangle=45,
-                tickfont=dict(size=10)
+                tickfont=dict(size=10),
+                side='bottom'
             ),
-            side='bottom', 
+            #side='bottom', 
             yaxis=dict(
                 title=f"Set 1: {outcome1} ({session1})",
                 autorange='reversed',

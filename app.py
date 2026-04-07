@@ -1771,6 +1771,7 @@ def get_correlation_matrix(df, include_sex_bin=True):
     - corr_matrix: DataFrame of correlation coefficients
     - pval_matrix: DataFrame of FDR-corrected p-values
     """
+    df = df.copy(deep=True)
     # Select and clean numeric data
     df_num = df.select_dtypes(include=['float64', 'int64','bool']).dropna(axis=1, thresh=int(0.5 * len(df)))
     
@@ -1820,9 +1821,15 @@ def get_correlation_matrix(df, include_sex_bin=True):
         index_pairs.append((col1, col2))
 
     # Fill diagonal
-    np.fill_diagonal(corr_matrix.values, 1.0)
-    for col in cols:
-        pval_matrix.loc[col, col] = 0.0  # p-value for diagonal is 0
+    corr_vals = corr_matrix.values.copy() 
+    np.fill_diagonal(corr_vals, 1.0)
+    corr_matrix = pd.DataFrame(corr_vals, index=cols, columns=cols)
+
+    pval_vals = pval_matrix.values.copy()
+    np.fill_diagonal(pval_vals, 0.0)
+    pval_matrix = pd.DataFrame(pval_vals, index=cols, columns=cols)
+    # for col in cols:
+    #     pval_matrix.loc[col, col] = 0.0  # p-value for diagonal is 0
 
     # Apply FDR correction (Benjamini-Hochberg)
     if pvals_list:

@@ -2046,6 +2046,7 @@ app.layout = dbc.Container([
         'current_groups': []
     }),
     dcc.Store(id='master-store'),
+    dcc.Store(id='ttest-results-store', data=None),
     #dcc.Store(id='ttest-cleaned-data-store', data=None),
 
     # ==================== SOURCE DE DONNÉES ===========================
@@ -2075,7 +2076,7 @@ app.layout = dbc.Container([
         # style={'background-color': '#9caf88', 'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.08)'})
         html.Div([
             dbc.Col([
-                html.H1("🧠 Neurotransmitter Balance & Outcomes", 
+                html.H1(" Neurotransmitter Balance & Outcomes", 
                     className="custom-title text-center mb-3",
                     style={'color': '#e6f8ec', 'font-weight': '600'}),
                 html.H4("Explore neurotransmitter ratios and their clinical relevance", 
@@ -2088,7 +2089,7 @@ app.layout = dbc.Container([
 
     # ==================== SECTION UPLOAD =============================
     html.Hr(),
-    html.H3("📦 Data Upload"),
+    html.H3(" Data Upload"),
     html.P(
         [
             "The ZIP file must include the following files:",
@@ -2184,7 +2185,7 @@ app.layout = dbc.Container([
     html.Div(id="main-configuration-container", children=[ 
     
         html.Hr(),
-        html.H3("📊 Profile Configuration"),
+        html.H3(" Profile Configuration"),
         
         # Sélecteurs principaux (dataset et type d'analyse)
         dbc.Row([
@@ -3016,7 +3017,7 @@ def create_statistics_tab(df1, df2):
 def create_data_explorer_tab(df1, df2):
     """Onglet Explorateur de données"""
     return html.Div([
-        html.H3("📋 Data Explorer"),
+        html.H3(" Data Explorer"),
         
         html.Label("Select Dataset to Explore:"),
         dcc.RadioItems(
@@ -4205,7 +4206,7 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
             # Onglets pour résultats et visualisations
             dbc.Tabs([
                 dbc.Tab(
-                    label="📋 Detailed Results",
+                    label=" Detailed Results",
                     children=[
                         dash_table.DataTable(
                             data=results_display.to_dict('records'),
@@ -4233,7 +4234,7 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
                 ),
                 
                 dbc.Tab(
-                    label="📊 Results Visualization", 
+                    label=" Results Visualization", 
                     children=results_viz
                 )
             ])
@@ -4418,7 +4419,7 @@ def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter
 # Callback pour exécuter l'analyse T-Test et afficher les résultats
 @app.callback(
     [Output('ttest-results-container', 'children'),
-    Output('ttest-cleaned-data-store', 'data')],
+    Output('ttest-results-store', 'data')],
     [Input('run-ttest-analysis', 'n_clicks'),
      Input('ttest-type', 'value'),
      Input('ttest-dataset', 'value')],
@@ -4440,14 +4441,14 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
     """Exécute l'analyse T-Test et retourne les résultats"""
     
     if n_clicks is None or n_clicks == 0:
-        return html.Div("Configurez les paramètres et cliquez sur 'Run T-Test Analysis'"), None
+        return html.Div("Configure the parameters and click on ‘Run T-Test Analysis’."), None
     
     # Validation des paramètres
     if not all([g1_session, g2_session]):
-        return dbc.Alert("Veuillez sélectionner une session pour les deux groupes", color="warning"), None
+        return dbc.Alert("Please select a session for both groups.", color="warning"), None
     
     if not variables:
-        return dbc.Alert("Veuillez sélectionner au moins une variable à comparer", color="warning"), None
+        return dbc.Alert("Please select at least one variable to compare.", color="warning"), None
     
     # Sélectionner les données
     if dataset == 'master-store':
@@ -4458,7 +4459,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
         data = data2
     
     if not data:
-        return dbc.Alert("Aucune donnée disponible pour l'analyse", color="danger"), None
+        return dbc.Alert("No data available for analysis.", color="danger"), None
     
     df = pd.DataFrame(data)
     
@@ -4485,7 +4486,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
     g2_subjects = get_group_subjects(g2_session, g2_sex, g2_groups)
     
     if len(g1_subjects) < 3 or len(g2_subjects) < 3:
-        return dbc.Alert(f"Groupes trop petits: Groupe 1={len(g1_subjects)}, Groupe 2={len(g2_subjects)} (minimum 3 requis)", color="warning"), None
+        return dbc.Alert(f"Groups too small: Group 1 ={len(g1_subjects)}, Group 2={len(g2_subjects)} (minimum of 3 required)", color="warning"), None
     
     # Vérification pour test apparié
     paired = (test_type == 'paired')
@@ -4496,14 +4497,14 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
         common_base_ids = g1_base_ids & g2_base_ids
         
         if not common_base_ids:
-            return dbc.Alert("Aucun sujet commun trouvé pour le test apparié", color="warning"), None
+            return dbc.Alert("No common subjects found for the paired test.", color="warning"), None
         
         # Filtrer pour ne garder que les paires valides
         g1_subjects = [subj for subj in g1_subjects if subj.split('-V')[0] in common_base_ids]
         g2_subjects = [subj for subj in g2_subjects if subj.split('-V')[0] in common_base_ids]
         
         if len(common_base_ids) < 3:
-            return dbc.Alert(f"Seulement {len(common_base_ids)} paires valides trouvées (minimum 3 requis)", color="warning"), None
+            return dbc.Alert(f"Only {len(common_base_ids)} valid pairs found (minimum of 3 required).", color="warning"), None
     
     # Préparer les données
     df_g1 = df[df['subject'].isin(g1_subjects)]
@@ -4549,17 +4550,35 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                 # valid_variables.append(var)
     
     if not results:
-        return dbc.Alert("Aucune analyse valide n'a pu être effectuée", color="warning"), None
+        return dbc.Alert("No valid analysis could be performed.", color="warning"), None
     
     # Créer le DataFrame des résultats
     results_df = pd.DataFrame(results)
-    
+
+    # ========== STOCKAGE DES RÉSULTATS POUR LE TÉLÉCHARGEMENT ==========
+    results_store = {
+        'results_df': results_df.to_dict('records'),
+        'test_type': test_type,
+        'group1_info': {
+            'session': g1_session,
+            'sex': g1_sex,
+            'groups': g1_groups,
+            'n_subjects': len(g1_subjects)
+        },
+        'group2_info': {
+            'session': g2_session,
+            'sex': g2_sex,
+            'groups': g2_groups,
+            'n_subjects': len(g2_subjects)
+        }
+    }
+
     # Interface avec onglets
     tabs = dbc.Tabs([
         # Onglet 1: Résultats statistiques
         dbc.Tab(
             dbc.Card([
-                dbc.CardHeader("Résultats Statistiques"),
+                dbc.CardHeader("Statistical Results"),
                 dbc.CardBody([
                     html.Div([
                         dash_table.DataTable(
@@ -4568,9 +4587,9 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                                 {"name": "Variable", "id": "variable"},
                                 {"name": "Test", "id": "test_type"},
                                 {"name": "p-value", "id": "p_value", "type": "numeric", "format": {"specifier": ".4f"}},
-                                {"name": "Significatif", "id": "significant"},
-                                {"name": "Moyenne G1", "id": "mean_group1", "type": "numeric", "format": {"specifier": ".3f"}},
-                                {"name": "Moyenne G2", "id": "mean_group2", "type": "numeric", "format": {"specifier": ".3f"}},
+                                {"name": "Significant", "id": "significant"},
+                                {"name": "Mean G1", "id": "mean_group1", "type": "numeric", "format": {"specifier": ".3f"}},
+                                {"name": "Mean G2", "id": "mean_group2", "type": "numeric", "format": {"specifier": ".3f"}},
                                 {"name": "Effect Size", "id": "effect_size", "type": "numeric", "format": {"specifier": ".3f"}},
                                 {"name": "N G1", "id": "n_group1"},
                                 {"name": "N G2", "id": "n_group2"}
@@ -4592,7 +4611,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                     ]),
                     html.Hr(),
                     html.Div([
-                        dbc.Button("Télécharger les résultats Excel", 
+                        dbc.Button("Download Excel Results", 
                                  id="download-ttest-results", 
                                  color="success", 
                                  className="me-2"),
@@ -4600,17 +4619,17 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                     ])
                 ])
             ]),
-            label="Résultats Statistiques"
+            label="Statistical Results"
         ),
         
         # Onglet 2: Visualisation
         dbc.Tab(
             dbc.Card([
-                dbc.CardHeader("Visualisation des Résultats"),
+                dbc.CardHeader("Results Visualization"),
                 dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
-                            dbc.Label("Type de graphique"),
+                            dbc.Label("Chart Type"),
                             dbc.RadioItems(
                                 id='ttest-plot-type',
                                 options=[
@@ -4622,7 +4641,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                             )
                         ], width=6),
                         dbc.Col([
-                            dbc.Label("Variable à visualiser"),
+                            dbc.Label("Variable to visualize"),
                             dcc.Dropdown(
                                 id='ttest-plot-variable',
                                 options=[{'label': v, 'value': v} for v in valid_variables],
@@ -4633,11 +4652,11 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
                     html.Div(id='ttest-plot-container')
                 ])
             ]),
-            label="Visualisation"
+            label="Vizualisation"
         )
     ])
     
-    return tabs, cleaned_data_dict
+    return tabs, results_store
 
 # Callback pour mettre à jour le dropdown des variables
 @app.callback(
@@ -4668,7 +4687,7 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
     """Met à jour les graphiques pour T-Test"""
     
     if not variable or not cleaned_data_store or variable not in cleaned_data_store:
-        return html.Div("Sélectionnez une variable valide")
+        return html.Div("Please select a valid variable")
     
     # Récupérer les vraies données
     var_data = cleaned_data_store[variable]
@@ -4682,7 +4701,7 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
         # Ajouter les violons pour chaque groupe
         fig.add_trace(go.Violin(
             y=group1_data,  
-            name="Groupe 1",
+            name="Group 1",
             box_visible=True,
             meanline_visible=True,
             points="all",
@@ -4692,7 +4711,7 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
         
         fig.add_trace(go.Violin(
             y=group2_data,  # Remplacer par df2_clean[variable]
-            name="Groupe 2", 
+            name="Group 2", 
             box_visible=True,
             meanline_visible=True,
             points="all",
@@ -4705,7 +4724,7 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
         
         fig.add_trace(go.Box(
             y=group1_data,  # Remplacer par df1_clean[variable]
-            name="Groupe 1",
+            name="Group 1",
             boxpoints='all',  # Montrer tous les points
             jitter=0.3,       # Éviter la superposition
             pointpos=-1.8,
@@ -4714,7 +4733,7 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
         
         fig.add_trace(go.Box(
             y=group2_data,  # Remplacer par df2_clean[variable]
-            name="Groupe 2",
+            name="Group 2",
             boxpoints='all',  # Montrer tous les points
             jitter=0.3,       # Éviter la superposition
             pointpos=-1.8,
@@ -4722,9 +4741,9 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
         ))
     
     fig.update_layout(
-        title=f"Comparaison des groupes - {variable}",
+        title=f"Group Comparison - {variable}",
         yaxis_title=variable,
-        xaxis_title="Groupes",
+        xaxis_title="Groups",
         height=500,
         showlegend=True
     )
@@ -4735,15 +4754,74 @@ def update_ttest_plots(plot_type, variable, cleaned_data_store):
 @app.callback(
     Output("download-ttest", "data"),
     Input("download-ttest-results", "n_clicks"),
+    State("ttest-results-store", "data"),
     prevent_initial_call=True
 )
-def download_ttest_results(n_clicks):
+def download_ttest_results(n_clicks, stored_results):
     """Télécharge les résultats T-Test en Excel"""
     # Récupérer les résultats depuis le store
-    # results_df = ...
+    if not n_clicks or not stored_results:
+        raise PreventUpdate
+    
+    # Récupérer les résultats
+    results_df = pd.DataFrame(stored_results['results_df'])
+    
+    # Créer un fichier Excel en mémoire avec mise en forme
+    output = io.BytesIO()
+    
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        # Feuille 1 : Résultats statistiques
+        results_df.to_excel(writer, sheet_name='Results', index=False)
+        
+        # Feuille 2 : Informations sur l'analyse
+        info_data = {
+            'Parameter': [
+                'Test Type',
+                'Group 1 Session',
+                'Group 1 Sex',
+                'Group 1 Groups',
+                'Group 1 N',
+                'Group 2 Session',
+                'Group 2 Sex',
+                'Group 2 Groups',
+                'Group 2 N'
+            ],
+            'Value': [
+                stored_results['test_type'],
+                stored_results['group1_info']['session'],
+                stored_results['group1_info']['sex'],
+                ', '.join(stored_results['group1_info']['groups']) if stored_results['group1_info']['groups'] else 'All',
+                stored_results['group1_info']['n_subjects'],
+                stored_results['group2_info']['session'],
+                stored_results['group2_info']['sex'],
+                ', '.join(stored_results['group2_info']['groups']) if stored_results['group2_info']['groups'] else 'All',
+                stored_results['group2_info']['n_subjects']
+            ]
+        }
+        info_df = pd.DataFrame(info_data)
+        info_df.to_excel(writer, sheet_name='Analysis Info', index=False)
+        
+        # Mise en forme
+        workbook = writer.book
+        worksheet = writer.sheets['Results']
+        
+        # Format pour les p-values significatives
+        red_format = workbook.add_format({'bg_color': '#FFE4E1', 'bold': True})
+        
+        # Appliquer le format aux p-values < 0.05
+        for row_num, row_data in enumerate(results_df.to_dict('records'), start=1):
+            if row_data.get('p_value', 1) < 0.05:
+                worksheet.write(row_num, 2, row_data['p_value'], red_format)
+    
+    output.seek(0)
+    
+    # Générer un nom de fichier avec timestamp
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"ttest_results_{timestamp}.xlsx"
     
     # Pour l'instant, retourner un fichier vide
-    return dcc.send_data_frame(pd.DataFrame().to_excel, "ttest_results.xlsx")
+    return dcc.send_bytes(output.getvalue(), filename)
 
 #================================= Correlation analyses =================================
 

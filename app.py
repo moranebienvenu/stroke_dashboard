@@ -464,7 +464,7 @@ def sync_api_plots_to_dash(active_tab):
 # Callback pour synchroniser les overlays avec Dash
 @app.callback(
     Output('overlay-store', 'data'),
-    Input('overlay-generate-btn', 'n_clicks'),
+    Input('add-overlay-btn', 'n_clicks'),
     prevent_initial_call=True
 )
 def sync_overlay_to_dash(n_clicks):
@@ -917,14 +917,18 @@ def process_zip_to_dataframe(contents, filename):
                 if "clinical_data" in filename:
                     with z.open(filename) as f:
                         try:
+                            raw = f.read()
                             if filename.endswith(".csv"):
-                                content = f.read().decode("utf-8")
-                                if "," in content and " " in content:
+                                content = raw.decode("utf-8")
+                                if ";" in content:
+                                    df_clinical = pd.read_csv(io.StringIO(content), sep=";")
+                                elif "," in content and " " in content:
                                     df_clinical = pd.read_csv(io.StringIO(content), sep=" ", decimal=",")
                                 else:
                                     df_clinical = pd.read_csv(io.StringIO(content))
                             else:
-                                df_clinical = pd.read_excel(f, engine="openpyxl")
+                                # xlsx = zip internally; read from bytes
+                                df_clinical = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
                         except Exception as e:
                             print(f"Error loading clinical file: {e}")
                     continue  
@@ -999,6 +1003,10 @@ def process_zip_to_dataframe(contents, filename):
 
     # Create final DataFrame
     final_df = pd.DataFrame(combined_rows)
+
+    #new add to normalize
+    if 'Sexe_bin' in final_df.columns and 'sex' not in final_df.columns:
+        final_df['sex'] = final_df['Sexe_bin'].map({1: 'M', 0: 'F'})
     
     # Reorganize columns for logical order
     if systems_list:
@@ -1020,30 +1028,57 @@ def process_zip_to_dataframe(contents, filename):
 
     return final_df
 
+# def detect_group(subject_id):
+#     """Detect subject group from ID"""
+#     if "_sub-NA" in subject_id or "-NA" in subject_id:
+#         return "NA"
+#     elif "_sub-AN" in subject_id or "-AN" in subject_id: 
+#         return "AN"
+#     elif "_sub-A" in subject_id or "-A" in subject_id:
+#         return "A"
+#     elif "_sub-C" in subject_id or "-C" in subject_id: 
+#         return "C"
+#     elif "_sub-B" in subject_id or "-B" in subject_id: 
+#         return "B"
+#     elif "_sub-W" in subject_id or "-W" in subject_id: 
+#         return "W"
+#     elif "_sub-G" in subject_id or "-G" in subject_id: 
+#         return "G"
+#     elif "_sub-TCM" in subject_id or "-TCM" in subject_id: 
+#         return "TCM"
+#     elif "_sub-TCS" in subject_id or "-TCS" in subject_id: 
+#         return "TCS"
+#     elif "_sub-TCMix" in subject_id or "-TCMix" in subject_id: 
+#         return "TCMix"
+#     else:
+#         return "Unknown"
+
+#changed the order
 def detect_group(subject_id):
-    """Detect subject group from ID"""
-    if "_sub-NA" in subject_id or "-NA" in subject_id:
+    # Mettre les patterns les plus longs EN PREMIER
+    if "_sub-TCMix" in subject_id or "-TCMix" in subject_id:
+        return "TCMix"
+    elif "_sub-TCM" in subject_id or "-TCM" in subject_id:
+        return "TCM"
+    elif "_sub-TCS" in subject_id or "-TCS" in subject_id:
+        return "TCS"
+    elif "_sub-NA" in subject_id or "-NA" in subject_id:
         return "NA"
-    elif "_sub-AN" in subject_id or "-AN" in subject_id: 
+    elif "_sub-AN" in subject_id or "-AN" in subject_id:
         return "AN"
     elif "_sub-A" in subject_id or "-A" in subject_id:
         return "A"
-    elif "_sub-C" in subject_id or "-C" in subject_id: 
+    elif "_sub-C" in subject_id or "-C" in subject_id:
         return "C"
-    elif "_sub-B" in subject_id or "-B" in subject_id: 
+    elif "_sub-B" in subject_id or "-B" in subject_id:
         return "B"
-    elif "_sub-W" in subject_id or "-W" in subject_id: 
+    elif "_sub-W" in subject_id or "-W" in subject_id:
         return "W"
-    elif "_sub-G" in subject_id or "-G" in subject_id: 
+    elif "_sub-G" in subject_id or "-G" in subject_id:
         return "G"
-    elif "_sub-TCM" in subject_id or "-TCM" in subject_id: 
-        return "TCM"
-    elif "_sub-TCS" in subject_id or "-TCS" in subject_id: 
-        return "TCS"
-    elif "_sub-TCMix" in subject_id or "-TCMix" in subject_id: 
-        return "TCMix"
     else:
         return "Unknown"
+    
 
 def create_interactive_plots(df, subjects, title_suffix="", is_group=False, is_overlay=False):
     # Filtrer les données et calculer les moyennes que si groupe sinon mettre les données individuelles pour chaque sujet base/overlay
@@ -1235,32 +1270,42 @@ def get_subjects_by_criteria(df, analysis_type, session=None, sex_filter="All", 
             
         return subjects, title,  sex_filter, session 
 
-def get_dataset(dataset_sel, data1, data2, master_store, data_source):
-    if dataset_sel == 'dataset1':
-        return data1
-    elif dataset_sel == 'dataset2':
-        return data2
-    elif data_source == 'master': # or dataset_sel == 'master':
-        return master_store
+# def get_dataset(dataset_sel, data1, data2, master_store, data_source):
+#     if dataset_sel == 'dataset1':
+#         return data1
+#     elif dataset_sel == 'dataset2':
+#         return data2
+#     elif data_source == 'master': # or dataset_sel == 'master':
+#         return master_store
 
-    return None
+#     return None
+
+def get_dataset(dataset_sel, data1, data2, master_store, data_source):
+    if dataset_sel == 'dataset1' and data1:
+        return data1
+    elif dataset_sel == 'dataset2' and data2:
+        return data2
+    elif data_source == 'master' and master_store:
+        return master_store
+    return master_store or data1 or data2  # fallback
 
 #nouvelle fonction pour les statistiques
 def get_data_for_analysis(dataset_sel, data1, data2, master_store):
     """Récupère les données appropriées pour l'analyse avec support master"""
-    if dataset_sel == 'master-store' and master_store:
-        return pd.DataFrame(master_store)
-    elif dataset_sel == 'dataset1' and data1:
-        return pd.DataFrame(data1)
-    elif dataset_sel == 'dataset2' and data2:
-        return pd.DataFrame(data2)
-    elif dataset_sel == 'both' and data1 and data2:
+    data2_resolved = data2 if data2 else master_store
+    if dataset_sel == 'dataset1':
+        return pd.DataFrame(data1) if data1 else None
+    elif dataset_sel == 'dataset2':
+        return pd.DataFrame(data2_resolved) if data2_resolved else None
+    elif dataset_sel == 'both' and data1 and data2_resolved:
         df1 = pd.DataFrame(data1)
-        df2 = pd.DataFrame(data2)
+        df2 = pd.DataFrame(data2_resolved)
         df = pd.concat([df1, df2], ignore_index=True)
         df['dataset'] = ['Dataset 1'] * len(df1) + ['Dataset 2'] * len(df2)
         return df
     return None
+
+   
 
 def get_subjects_for_analysis(df, analysis_type, session, sex, glm_subjects, 
                             group1_subjects, group2_subjects, corr_group1, 
@@ -1440,11 +1485,20 @@ def run_glm_analysis(
                         continue
 
                     drop_cols = list(set([outcome, predictor] + covariate + ([interaction_var] if interaction_var else [])))
-                    df_clean = df_merged.dropna(subset=drop_cols)
+                    df_clean = df_merged.dropna(subset=drop_cols).copy()
 
                     if df_clean.empty or len(df_clean) < 3:
                         error_messages.append(f"Données insuffisantes pour {outcome} ~ {predictor} (n={len(df_clean)})")
                         continue
+
+                    # Encoder les variables catégorielles (ex: sex M/F → 1/0)
+                    for col in drop_cols:
+                        if col in df_clean.columns and df_clean[col].dtype == object:
+                            uniq = df_clean[col].dropna().unique()
+                            if len(uniq) == 2:
+                                df_clean[col] = (df_clean[col] == uniq[0]).astype(int)
+                            else:
+                                df_clean[col] = pd.Categorical(df_clean[col]).codes
 
                     non_numeric = df_clean[drop_cols].select_dtypes(exclude=['number']).columns.tolist()
                     if non_numeric:
@@ -2000,7 +2054,7 @@ def create_correlation_results(corr_matrix, pval_matrix, vars1, vars2, session1,
     ])
     
     return html.Div([
-        html.H3("🔗 Correlation Analysis Results"),
+        html.H3(" Correlation Analysis Results"),
         html.P(f"Session 1: {session1}, {len(vars1)} variables | Session 2: {session2}, {len(vars2)} variables"),
         html.P(f"Common subjects: {cross_corr.shape[0]}"),
         tabs,
@@ -2026,19 +2080,86 @@ def create_correlation_results(corr_matrix, pval_matrix, vars1, vars2, session1,
 
 # ---------------------------- Layout setting -------------------------------
 
+# ==================== PALETTE DE COULEURS ====================
+COLORS = {
+    'background': '#F7F9FC',
+    'surface': '#FFFFFF',
+    'primary': '#2C5F8A',
+    'secondary': '#3A8C6E',
+    'text_primary': '#1A2332',
+    'text_muted': '#6B7A8F',
+    'border': '#E2E8F0',
+    'success': '#2D7D5A',
+    'warning': '#C97A1A',
+    'danger': '#C0392B',
+    'header_bg': '#2C5F8A',
+}
+
+def make_empty_fig(label=""):
+    fig = go.Figure()
+    fig.add_annotation(
+        text=label if label else "Select a subject and generate plots",
+        x=0.5, y=0.5,
+        xref="paper", yref="paper",
+        showarrow=False,
+        font=dict(size=13, color=COLORS['text_muted']),
+        xanchor="center", yanchor="middle"
+    )
+    fig.update_layout(
+        paper_bgcolor=COLORS['background'],
+        plot_bgcolor=COLORS['background'],
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=300,
+    )
+    return fig
+
+EMPTY_FIG = make_empty_fig()
+
+# ==================== STYLES RÉUTILISABLES ====================
+CARD_STYLE = {'border': f'1px solid {COLORS["border"]}', 'borderRadius': '8px'}
+CARD_HEADER_STYLE = {
+    'backgroundColor': '#F0F4F8',
+    'color': COLORS['primary'],
+    'fontWeight': '500',
+    'borderBottom': f'1px solid {COLORS["border"]}'
+}
+SECTION_TITLE_STYLE = {
+    'color': COLORS['primary'],
+    'fontWeight': '500',
+    'fontSize': '1.1rem',
+    'marginBottom': '4px'
+}
+SECTION_DIVIDER_STYLE = {
+    'margin': '6px 0 16px 0',
+    'border': 'none',
+    'borderTop': f'2px solid {COLORS["secondary"]}',
+    'opacity': '1'
+}
+
+def section_title(text):
+    """Génère un titre de section avec ligne colorée."""
+    return html.Div([
+        html.H5(text, style=SECTION_TITLE_STYLE),
+        html.Hr(style=SECTION_DIVIDER_STYLE)
+    ])
+# ==================== LAYOUT ====================
 app.layout = dbc.Container([
-    # ==================== STORES Main ==================================
+
+    # ==================== STORES ====================
     dcc.Store(id='dataset1-store'),
     dcc.Store(id='dataset2-store'),
-    dcc.Store(id='plots-store'), 
+    dcc.Store(id='plots-store'),
     dcc.Store(id='overlay-store', data={'overlays': []}),
+    dcc.Store(id='overlay-subjects-store', data=[]),
     dcc.Store(id='session-state', data={
         'base_plots': None,
         'overlay_plots': None,
         'show_overlay': False,
         'overlay_subjects': [],
         'overlay_color_map': {},
-        'subject_selections': {} ,
+        'subject_selections': {},
         'current_subjects': [],
         'current_title': '',
         'current_session': None,
@@ -2047,9 +2168,8 @@ app.layout = dbc.Container([
     }),
     dcc.Store(id='master-store'),
     dcc.Store(id='ttest-results-store', data=None),
-    #dcc.Store(id='ttest-cleaned-data-store', data=None),
 
-    # ==================== SOURCE DE DONNÉES ===========================
+    # ==================== SOURCE DE DONNÉES (cachée) ====================
     dcc.RadioItems(
         id='data-source',
         options=[
@@ -2061,397 +2181,407 @@ app.layout = dbc.Container([
         style={'display': 'none'}
     ),
 
-    # ==================== HEADER ======================================
+    # ==================== HEADER ====================
     html.Div([
-        # dbc.Row([
-        #     dbc.Col([
-        #         html.H1("🧠 Neurotransmitter Balance & Outcomes", 
-        #             className="text-center mb-3",
-        #             style={'color': '#e6f8ec', 'font-weight': '600'}),
-        #         html.H4("Explore neurotransmitter ratios and their clinical relevance", 
-        #             className="text-center",
-        #             style={'color': '#c8e6c9', 'font-weight': '400'})
-        #     ], width=12)
-        # ], className="p-4 mb-4 rounded", 
-        # style={'background-color': '#9caf88', 'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.08)'})
-        html.Div([
-            dbc.Col([
-                html.H1(" Neurotransmitter Balance & Outcomes", 
-                    className="custom-title text-center mb-3",
-                    style={'color': '#e6f8ec', 'font-weight': '600'}),
-                html.H4("Explore neurotransmitter ratios and their clinical relevance", 
-                    className="custom-subtitle text-center",
-                    style={'color': '#c8e6c9', 'font-weight': '400'})
-            ], className="p-4 mb-4 rounded", 
-           style={'background-color': '#9caf88', 'box-shadow': '0 4px 12px rgba(0, 0, 0, 0.08)'})
-        ])
-    ]),
+        html.H1(
+            "Neurotransmitter Balance & Clinical Outcomes",
+            style={
+                'color': '#FFFFFF',
+                'fontWeight': '600',
+                'fontSize': '1.8rem',
+                'margin': '0',
+                'letterSpacing': '1px',
+                'textAlign': 'center',
+                'textShadow': '0 1px 4px rgba(0,0,0,0.3)'
+            }
+        ),
+        html.Div(style={
+            'width': '60px', 'height': '2px',
+            'backgroundColor': COLORS['secondary'],
+            'margin': '10px auto 8px auto',
+            'borderRadius': '2px'
+        }),
+        html.P(
+            "Post-stroke aphasia — neurotransmitter disconnection & language recovery",
+            style={
+                'color': 'rgba(255,255,255,0.8)',
+                'margin': '0',
+                'fontSize': '0.95rem',
+                'fontStyle': 'italic',
+                'textAlign': 'center',
+                'letterSpacing': '0.3px'
+            }
+        )
+    ], style={
+        'backgroundColor': COLORS['header_bg'],
+        'padding': '28px 32px 24px 32px',
+        'borderBottom': f'3px solid {COLORS["secondary"]}',
+        'marginLeft': '-12px',
+        'marginRight': '-12px',
+        'marginBottom': '24px',
+        'backgroundImage': 'linear-gradient(135deg, #2C5F8A 0%, #1e4a6e 100%)'
+    }),
 
-    # ==================== SECTION UPLOAD =============================
-    html.Hr(),
-    html.H3(" Data Upload"),
-    html.P(
-        [
-            "The ZIP file must include the following files:",
-            html.Ul([
-                html.Li("One or more output_les_dis_sub-XXX_ses-VX.csv files"),
-                html.Li("One or more output_pre_post_synaptic_ratio_sub-XXX_ses-VX.csv files"),
-                html.Li("(Optional) One clinical_data.csv or .xlsx file"),
-            ]),
-            html.Strong("Important:"),
-            html.Ul([
-                html.Li([
-                    "Subject IDs must follow the format: ",
-                    html.Code("sub-<group letter><digits>_ses-V<session number>"),
-                    ", for example: ",
-                    html.Code("sub-A01_ses-V1"),
-                    " or ",
-                    html.Code("sub-G1234_ses-V2"),
-                    "."
-                ]),
-                html.Li("Group letters: NA (Non-aphasic), A (Aphasic), G (Global), W (Wernicke), B (Broca), C (Conduction), AN (Anomic), TCM (Transcortical Motor), TCS (Transcortical Sensory), TCMix (Transcortical Mixed)"),
-                html.Li("The clinical_data file must include a 'subject' column matching the filenames exactly."),
-                html.Li("Additional columns such as sex, timepoint, repetition_score, comprehension_score, naming_score, composite_score, lesion_volume are optional."),
-                html.Li("Lesion volume must be in mm³."),
-            ]),
-            html.Br(),
-            "You can use the example file ",
-            html.A(
-                "synthetic_dataset.zip",
-                href="https://github.com/moranebienvenu/stroke_dashboard",
-                target="_blank",
-                style={"textDecoration": "underline"}
+    # ==================== SECTION UPLOAD ====================
+    # Bouton toggle
+    dbc.Card([
+        dbc.CardHeader(
+            dbc.Button(
+            ["Data Upload  ", html.Span("▾", id="upload-toggle-icon")],
+            id="upload-collapse-btn",
+            color="link",
+            className="p-0 mb-2",
+            style={'color': COLORS['primary'], 'fontWeight': '500', 'fontSize': '1rem', 'textDecoration': 'none'}
             ),
-            " available on GitHub."
-        ],
-        ## need to have the possibility to use synthetuc dataset directly on the App with the second option dataset. 
-        style={
-            "backgroundColor": "#f8f9fa",
-            "padding": "15px",
-            "borderRadius": "10px",
-            "border": "1px solid #dee2e6",
-            "fontSize": "14px",
-            "lineHeight": "1.6"
-        }
-    ),
+                style=CARD_HEADER_STYLE, className="py-2 px-3"
+            ),
+        dbc.Collapse(
+            dbc.Card([
+                # dbc.CardHeader(
+                #     html.H5("Data Upload", className="mb-0", style=CARD_HEADER_STYLE),
+                #     style=CARD_HEADER_STYLE
+                # ),
+                dbc.CardBody([
+                    html.P([
+                        "The ZIP file must include the following files:",
+                        html.Br(), 
+                        "The first two file types must be generated using ",
+                        html.A(
+                            "NeuroTmap",
+                            href="https://github.com/Pedro-N-Alves/NeuroT-Map",
+                            target="_blank"
+                        ),
+                        " (see the reference article: Alves, P.N., Nozais, V., Hansen, J.Y. et al., ",
+                        html.I("Neurotransmitters’ white matter mapping unveils the neurochemical fingerprints of stroke"),
+                        ", Nat Commun 16, 2555 (2025), ",
+                        html.A(
+                            "https://doi.org/10.1038/s41467-025-57680-2 )",
+                            href="https://doi.org/10.1038/s41467-025-57680-2",
+                            target="_blank"
+                        ),
+                        html.Br(),
+                        html.Ul([
+                            html.Li("One or more output_les_dis_sub-XXX_ses-VX.csv files"),
+                            html.Li("One or more output_pre_post_synaptic_ratio_sub-XXX_ses-VX.csv files"),
+                            html.Li("(Optional) One clinical_data.csv or .xlsx file"),
+                        ]),
+                        html.Strong("Important:"),
+                        html.Ul([
+                            html.Li([
+                                "Subject IDs must follow the format: ",
+                                html.Code("sub-<group letter><digits>_ses-V<session number>"),
+                                ", for example: ",
+                                html.Code("sub-A01_ses-V1"),
+                                " or ",
+                                html.Code("sub-G1234_ses-V2"),
+                                "."
+                            ]),
+                            html.Li("Group letters: NA, A, G, W, B, C, AN, TCM, TCS, TCMix"),
+                            html.Li("The clinical_data file must include a 'subject' column matching the filenames exactly."),
+                            html.Li("Optional columns: sex, repetition_score, comprehension_score, naming_score, composite_score, lesion_volume (mm³)."),
+                        ]),
+                        html.Br(),
+                        html.Strong("Default Dataset 2 — Article data:"),
+                        html.P([
+                            "Dataset 2 is pre-loaded with the data from the reference preprint: ",
+                            html.Br(),
+                            html.I("Sex-specific early neurotransmitter dynamics and post-stroke aphasia recovery — "),
+                            "A specific dashboard template for reproducible preprints.",
+                            html.Br(),
+                            "Bienvenu M., Karakuzu A., Marcotte K., Thiebaut de Schotten M., Nascimento Alves P., Bedetti C., Brambati S.M., Stikov N. (2026). ",
+                            html.A(
+                                "View preprint on NeuroLibre",
+                                href="https://preview.neurolibre.org/myst/moranebienvenu/stroke_article/e0ea9d330c2d6aebf81ec6a435108ae4c050a4db/_build/html/index.html",
+                                target="_blank",
+                                style={"color": COLORS['primary'], "textDecoration": "underline"}
+                            ),
+                            "."
+                        ], style={'marginTop': '6px', 'marginBottom': '0'}),
+                        html.Br(),
+                        "Example file: ",
+                        html.A(
+                            "synthetic_dataset.zip",
+                            href="https://github.com/moranebienvenu/stroke_dashboard",
+                            target="_blank",
+                            style={"textDecoration": "underline", "color": COLORS['primary']}
+                        ),
+                        " available on GitHub."
+                    ], style={'fontSize': '13px', 'lineHeight': '1.7', 'color': COLORS['text_primary']}),
 
-    dbc.Row([
-        dbc.Col([
-            html.Label("Upload Dataset 1", className="form-label"),
-            dcc.Upload(
-                id='upload-data1',
-                children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                style={
-                    'width': '100%', 'height': '60px', 'lineHeight': '60px',
-                    'borderWidth': '1px', 'borderStyle': 'dashed',
-                    'borderRadius': '5px', 'textAlign': 'center',
-                    'margin': '10px'
-                },
-                multiple=False,
-                accept='.zip'
-            )
-        ], width=6),
-        dbc.Col([
-            html.Label("Upload Dataset 2 (Optional)", className="form-label"),
-            dcc.Upload(
-                id='upload-data2',
-                children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
-                style={
-                    'width': '100%', 'height': '60px', 'lineHeight': '60px',
-                    'borderWidth': '1px', 'borderStyle': 'dashed',
-                    'borderRadius': '5px', 'textAlign': 'center',
-                    'margin': '10px'
-                },
-                multiple=False,
-                accept='.zip'
-            )
-        ], width=6)
-    ]),
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label("Upload Dataset 1", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Upload(
+                                id='upload-data1',
+                                children=html.Div([
+                                    "Drag and Drop or ",
+                                    html.A("Select File", style={'color': COLORS['primary'], 'fontWeight': '500'})
+                                ]),
+                                style={
+                                    'width': '100%',
+                                    'height': '56px',
+                                    'lineHeight': '56px',
+                                    'borderWidth': '2px',
+                                    'borderStyle': 'dashed',
+                                    'borderColor': COLORS['border'],
+                                    'borderRadius': '6px',
+                                    'textAlign': 'center',
+                                    'backgroundColor': '#FAFBFD',
+                                    'fontSize': '13px'
+                                },
+                                multiple=False,
+                                accept='.zip'
+                            )
+                        ], width=6),
+                        dbc.Col([
+                            html.Label("Upload Dataset 2 (Optional)", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Upload(
+                                id='upload-data2',
+                                children=html.Div([
+                                    "Drag and Drop or ",
+                                    html.A("Select File", style={'color': COLORS['primary'], 'fontWeight': '500'})
+                                ]),
+                                style={
+                                    'width': '100%',
+                                    'height': '56px',
+                                    'lineHeight': '56px',
+                                    'borderWidth': '2px',
+                                    'borderStyle': 'dashed',
+                                    'borderColor': COLORS['border'],
+                                    'borderRadius': '6px',
+                                    'textAlign': 'center',
+                                    'backgroundColor': '#FAFBFD',
+                                    'fontSize': '13px'
+                                },
+                                multiple=False,
+                                accept='.zip'
+                            )
+                        ], width=6)
+                    ], className="mt-3"),
 
-    # Statut upload
-    html.Div(id='upload-status'),
+                    html.Div(id='upload-status', className="mt-2")
+                ])
+            ], className="mb-4 shadow-sm", style=CARD_STYLE),
+            id="upload-collapse",
+            is_open=False #True   # ouvert par défaut
+        )
+    ], className="mb-4 shadow-sm", style=CARD_STYLE),
 
-    # ==================== TABS POUR DIFFÉRENTES VUES ====================
+    # ==================== TABS ====================
     dbc.Tabs([
         dbc.Tab(label="Visualization", tab_id="tab-visualization"),
         dbc.Tab(label="Statistical Analysis", tab_id="tab-stats"),
         dbc.Tab(label="Data Explorer", tab_id="tab-data"),
-    ], id="tabs", active_tab="tab-visualization"),
-    
-    # Contenu dynamique des tabs
-    html.Div(id="tab-content", style={'min-height': '400px'}),
+    ], id="tabs", active_tab="tab-visualization", className="mb-3"),
 
-    # ==================== SECTION PRINCIPALE ============================
-    html.Div(id="main-configuration-container", children=[ 
-    
-        html.Hr(),
-        html.H3(" Profile Configuration"),
-        
-        # Sélecteurs principaux (dataset et type d'analyse)
-        dbc.Row([
-            dbc.Col([
-                html.Label("Dataset Selection:"),
-                dcc.RadioItems(
-                    id='dataset-selector',
-                    options=[
-                        {'label': 'Dataset 1', 'value': 'dataset1'},
-                        {'label': 'Dataset 2', 'value': 'dataset2'},
-                        #{'label': 'Master', 'value': 'master-store'},
-                    ],
-                    value='dataset1',
-                    inline=True
-                )
-            ], width=6),
-            dbc.Col([
-                html.Label("Analysis Type:"),
-                dcc.RadioItems(
-                    id='analysis-type',
-                    options=[
-                        {'label': 'Single subject', 'value': 'single'},
-                        {'label': 'By session and sex', 'value': 'session_sex'}
-                    ],
-                    value='single',
-                    inline=True
-                )
-            ], width=6),
-        ]),
-        
-        html.Br(),
-        
-        # ==================== CONTENEURS DE FILTRES (affichage dynamique) ====================
-        
-        # Conteneur pour sélection de sujet unique
+    html.Div(id="tab-content", style={'minHeight': '0'}),
+
+    # ==================== PROFILE CONFIGURATION ====================
+    html.Div(id="main-configuration-container", children=[
+
+        section_title("Profile Configuration"),
+
+        dbc.Card([
+            dbc.CardHeader("Dataset & Analysis Type", style=CARD_HEADER_STYLE),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Dataset Selection", className="fw-semibold small text-secondary mb-1"),
+                        dcc.RadioItems(
+                            id='dataset-selector',
+                            options=[
+                                {'label': 'Dataset 1', 'value': 'dataset1'},
+                                {'label': 'Dataset 2', 'value': 'dataset2'},
+                            ],
+                            value='dataset1',
+                            inline=True
+                        )
+                    ], width=6),
+                    dbc.Col([
+                        html.Label("Analysis Type", className="fw-semibold small text-secondary mb-1"),
+                        dcc.RadioItems(
+                            id='analysis-type',
+                            options=[
+                                {'label': 'Single subject', 'value': 'single'},
+                                {'label': 'By session and sex', 'value': 'session_sex'}
+                            ],
+                            value='single',
+                            inline=True
+                        )
+                    ], width=6),
+                ])
+            ])
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
+        # Conteneur sujet unique
         html.Div(id='subject-selection-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Select Subject:"),
-                    dcc.Dropdown(
-                        id='subject-dropdown',
-                        options=[],
-                        value=None,
-                        placeholder="Select a subject"
-                    )
-                ], width=12)
-            ])
+            dbc.Card([
+                dbc.CardBody([
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label("Select Subject", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Dropdown(id='subject-dropdown', options=[], value=None, placeholder="Select a subject")
+                        ], width=12)
+                    ])
+                ])
+            ], className="mb-3 shadow-sm", style=CARD_STYLE)
         ], style={'display': 'none'}),
-        
-        # Conteneur pour sélection de session
+
+        # Conteneur session + sex + groupes
         html.Div(id='session-filter-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Select Session:"),
-                    dcc.Dropdown(
-                        id='session-dropdown',
-                        options=[],
-                        value=None,
-                        placeholder="Select session"
-                    )
-                ], width=4)
-            ])
+            dbc.Card([
+                dbc.CardBody([
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label("Session", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Dropdown(id='session-dropdown', options=[], value=None, placeholder="Select session")
+                        ], width=4),
+                        dbc.Col([
+                            html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Dropdown(
+                                id='sex-filter',
+                                options=[],
+                                value=None,
+                                placeholder="Select sex filter"
+                            )
+                        ], width=4),
+                        dbc.Col([
+                            html.Label("Subject Groups", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Checklist(id='group-checklist', options=[], value=[], inline=True)
+                        ], width=4)
+                    ])
+                ])
+            ], className="mb-3 shadow-sm", style=CARD_STYLE)
         ], style={'display': 'none'}),
-        
-        # Conteneur pour filtre de sexe
-        html.Div(id='sex-filter-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Select Sex:"),
-                    dcc.Dropdown(
-                        id='sex-filter',
-                        options=[],
-                        value=None,
-                        placeholder="Select sex filter"
-                    )
-                ], width=4)
-            ])
-        ], style={'display': 'none'}),
-        
-        # Conteneur pour sélection de groupes
-        html.Div(id='group-selection-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Filter by Subject Group:"),
-                    dcc.Checklist(
-                        id='group-checklist',
-                        options=[],
-                        value=[],
-                        inline=True
-                    )
-                ], width=12)
-            ])
-        ], style={'display': 'none'}),
-        
-        html.Br(),
-        
-        # ==================== AFFICHAGE DU STATUT ====================
+
+        # Conteneur sex-filter-container et group-selection-container (conservés pour compatibilité callbacks)
+        html.Div(id='sex-filter-container', style={'display': 'none'}),
+        html.Div(id='group-selection-container', style={'display': 'none'}),
+
         dbc.Row([
             dbc.Col([
-                html.Label("Subjects Selected:"),
-                html.H4(id='subject-count-display', 
-                    children="0 subjects selected", 
-                    style={'font-weight': 'bold', 'color': '#2c3e50'})
+                html.Span("Subjects selected: ", className="text-muted small"),
+                html.Strong(id='subject-count-display', children="0", style={'color': COLORS['primary']})
             ], width=6),
             dbc.Col([
-                html.Label("Profile Status:"),
-                html.H4(id='profile-title', 
-                    children="No profile generated", 
-                    style={'font-weight': 'bold', 'color': '#7f8c8d'}
-                ),
-                html.H5(
-                id='profile-title-overlay', 
-                children="No overlay generated", 
-                style={'font-weight': 'bold', 'color': '#7f8c8d', 'margin-top': '10px'})       
+                html.Span("Profile: ", className="text-muted small"),
+                html.Strong(id='profile-title', children="None generated", style={'color': COLORS['text_muted']}),
+                html.Br(),
+                html.Span("Overlay: ", className="text-muted small"),
+                html.Strong(id='profile-title-overlay', children="None", style={'color': COLORS['text_muted']})
             ], width=6)
-        ]),
-        
-        html.Br(),
-        
-        # ==================== BOUTON GÉNÉRATION ====================
-        dbc.Row([
-            dbc.Col([
-                dbc.Button("Generate Profile", 
-                        id='generate-profile-btn', 
-                        color="primary", 
-                        size="lg",
-                        className="w-100")
-            ], width=12)
-        ]),
-        
-        html.Hr(),
-    ], style={'display': 'none'}),  
-    # ==================== SECTION OVERLAY ====================
+        ], className="mb-3"),
 
-    html.Div(id='enable-overlay-container', children=[ #modifier
-        #html.Div([
-            html.Label("Enable Overlay:"),
-            dcc.RadioItems(
-                id='enable-overlay',
-                options=[
-                    {'label': 'Yes', 'value': 'yes'},
-                    {'label': 'No', 'value': 'no'}
-                ],
-                value='no',
-                inline=True
-            )
-        ], style={'display': 'none'}),
-            
+        dbc.Button(
+            "Generate Profile",
+            id='generate-profile-btn',
+            style={
+                'backgroundColor': COLORS['primary'],
+                'border': 'none',
+                'padding': '10px 28px',
+                'fontWeight': '500',
+                'borderRadius': '6px'
+            }
+        ),
+
+        html.Hr(style={'marginTop': '20px', 'marginBottom': '0'}),
+
+    ], style={'display': 'none'}),
+
+    # ==================== OVERLAY ====================
+    html.Div(id='enable-overlay-container', children=[
+        html.Label("Enable Overlay", className="fw-semibold small text-secondary mb-1"),
+        dcc.RadioItems(
+            id='enable-overlay',
+            options=[
+                {'label': 'Yes', 'value': 'yes'},
+                {'label': 'No', 'value': 'no'}
+            ],
+            value='no',
+            inline=True
+        )
+    ], style={'display': 'none'}),
+
     html.Div(id='overlay-options-container', children=[
-        html.Hr(),
-        html.H4("Overlay Configuration"),
-        dbc.Row([
-            dbc.Col([
-                html.Label("Overlay Dataset:"),
-                dcc.RadioItems(
-                    id='overlay-dataset-selector',
-                    options=[
-                        {'label': 'Dataset 1', 'value': 'dataset1'},
-                        {'label': 'Dataset 2', 'value': 'dataset2'}
-                    ],
-                    value='dataset1',
-                    inline=True
-                )
-            ], width=6),
-            dbc.Col([
-                html.Label("Overlay Analysis Type:"),
-                dcc.RadioItems(
-                    id='overlay-analysis-type',
-                    options=[
-                        {'label': 'Single subject', 'value': 'single'},
-                        {'label': 'By session and sex', 'value': 'session_sex'}
-                    ],
-                    value='single',
-                    inline=True
-                )
-            ], width=6),
-        ]), 
-        
-        html.Br(),
+        dbc.Card([
+            dbc.CardHeader("Overlay Configuration", style=CARD_HEADER_STYLE),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Overlay Dataset", className="fw-semibold small text-secondary mb-1"),
+                        dcc.RadioItems(
+                            id='overlay-dataset-selector',
+                            options=[
+                                {'label': 'Dataset 1', 'value': 'dataset1'},
+                                {'label': 'Dataset 2', 'value': 'dataset2'}
+                            ],
+                            value='dataset1',
+                            inline=True
+                        )
+                    ], width=6),
+                    dbc.Col([
+                        html.Label("Overlay Analysis Type", className="fw-semibold small text-secondary mb-1"),
+                        dcc.RadioItems(
+                            id='overlay-analysis-type',
+                            options=[
+                                {'label': 'Single subject', 'value': 'single'},
+                                {'label': 'By session and sex', 'value': 'session_sex'}
+                            ],
+                            value='single',
+                            inline=True
+                        )
+                    ], width=6),
+                ], className="mb-3"),
 
+                html.Div(id='overlay-subject-container', children=[
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label("Overlay Subject", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Dropdown(id='overlay-subject-dropdown', options=[], value=None, placeholder="Select overlay subject")
+                        ], width=12)
+                    ], className="mb-2")
+                ], style={'display': 'none'}),
 
-        # Conteneurs d'overlay (mêmes que les principaux)
-        html.Div(id='overlay-subject-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Select Overlay Subject:"),
-                    dcc.Dropdown(
-                        id='overlay-subject-dropdown',
-                        options=[],
-                        value=None,
-                        placeholder="Select overlay subject"
-                    )
-                ], width=12)
-            ])
-        ], style={'display': 'none'}),
+                html.Div(id='overlay-session-container', children=[
+                    dbc.Row([
+                        dbc.Col([
+                            html.Label("Session", className="fw-semibold small text-secondary mb-1"),
+                            dcc.Dropdown(id='overlay-session-dropdown', options=[], value=None, placeholder="Select session")
+                        ], width=4),
+                        dbc.Col([
+                            html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
+                            html.Div(id='overlay-sex-container', children=[
+                                dcc.Dropdown(id='overlay-sex-filter', options=[], value=None, placeholder="Select sex")
+                            ])
+                        ], width=4),
+                        dbc.Col([
+                            html.Label("Groups", className="fw-semibold small text-secondary mb-1"),
+                            html.Div(id='overlay-groups-container', children=[
+                                dcc.Checklist(id='overlay-group-checklist', options=[], value=[], inline=True)
+                            ])
+                        ], width=4)
+                    ], className="mb-2")
+                ], style={'display': 'none'}),
 
-        html.Div(id='overlay-session-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Overlay Session:"),
-                    dcc.Dropdown(
-                        id='overlay-session-dropdown',
-                        options=[],
-                        value=None,
-                        placeholder="Select overlay session"
-                    )
-                ], width=4)
+                dbc.Row([
+                    dbc.Col([
+                        html.Span("Overlay subjects: ", className="text-muted small"),
+                        html.Strong(id='overlay-subject-count', children="0", style={'color': COLORS['warning']})
+                    ], width=6),
+                    dbc.Col([
+                        dbc.Button("Add Overlay", id='add-overlay-btn', size="sm",
+                            style={'backgroundColor': COLORS['secondary'], 'border': 'none', 'marginRight': '8px'}),
+                        dbc.Button("Clear Overlays", id='clear-overlay-btn', size="sm",
+                            style={'backgroundColor': COLORS['danger'], 'border': 'none'})
+                    ], width=6)
+                ])
             ])
-        ], style={'display': 'none'}),
-        
-        html.Div(id='overlay-sex-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Overlay Sex:"),
-                    dcc.Dropdown(
-                        id='overlay-sex-filter',
-                        options=[],
-                        value=None,
-                        placeholder="Select overlay sex filter"
-                    )
-                ], width=4)
-            ])
-        ], style={'display': 'none'}),
-        
-        html.Div(id='overlay-groups-container', children=[
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Overlay Groups:"),
-                    dcc.Checklist(
-                        id='overlay-group-checklist',
-                        options=[],
-                        value=[],
-                        inline=True
-                    )
-                ], width=12)
-            ])
-        ], style={'display': 'none'}),
-        
-        html.Br(),
-        
-        dbc.Row([
-            dbc.Col([
-                html.Label("Overlay Status:"),
-                html.Div(id='overlay-subject-count', 
-                        children="0 overlay subjects", 
-                        style={'font-weight': 'bold', 'color': '#e74c3c'})
-            ], width=6),
-            dbc.Col([
-                dbc.Button("Add Overlay", 
-                        id='add-overlay-btn', 
-                        color="warning", 
-                        size="md"),
-                dbc.Button("Clear Overlays", 
-                        id='clear-overlay-btn', 
-                        color="danger", 
-                        size="md",
-                        className="ms-2")
-            ], width=6)
-        ])
-    ], style={'display': 'none'}), 
+        ], className="mb-4 shadow-sm", style=CARD_STYLE)
+    ], style={'display': 'none'}),
 
-    # ==================== ÉLÉMENTS STATISTIQUES (cachés) ====================
+    # ==================== STATISTIQUES — CONTRÔLES CACHÉS ====================
     html.Div([
         html.Div(id='stats-method-container', children=[
-            dbc.Label("Choose Analysis Method:", className="fw-bold mb-0"),
-            #html.Label("Choose Analysis Method:", className="fw-bold"),
             dcc.RadioItems(
                 id='stats-method',
                 options=[
@@ -2460,28 +2590,24 @@ app.layout = dbc.Container([
                     {'label': 'Correlation', 'value': 'correlation'}
                 ],
                 value='glm',
-                inline=True,
+                inline=True
             )
-        ], style={'display': 'none'}),  # ← Conteneur caché au début
-        
+        ], style={'display': 'none'}),
+
         html.Div(id='stats-dataset-container', children=[
-            dbc.Label("Select Dataset for Analysis:", className="fw-bold mb-0"),
-            #html.Label("Select Dataset for Analysis:", className="fw-bold"),
             dcc.RadioItems(
                 id='stats-dataset',
                 options=[
                     {'label': 'Dataset 1', 'value': 'dataset1'},
-                    {'label': 'Dataset 2', 'value': 'dataset2'},
-                    {'label': 'Both Datasets', 'value': 'both'}
+                    {'label': 'Dataset 2 ', 'value': 'dataset2'},
+                    #{'label': 'Both Datasets', 'value': 'both'}
                 ],
-                value='dataset1',
-                inline=True,
+                value='dataset2',
+                inline=True
             )
         ], style={'display': 'none'}),
-        
+
         html.Div(id='stats-analysis-type-container', children=[
-            dbc.Label("Analysis Type:", className="fw-bold mb-0"), 
-            #html.Label("Analysis Type:", className="fw-bold"),
             dcc.RadioItems(
                 id='stats-analysis-type',
                 options=[
@@ -2489,43 +2615,55 @@ app.layout = dbc.Container([
                     {'label': 'Personalized subject list', 'value': 'personalized'}
                 ],
                 value='session_sex',
-                inline=True, 
+                inline=True
             )
-        ], style={'display': 'none'}) 
+        ], style={'display': 'none'})
     ]),
-    # ==================== SECTION GLM (CACHÉE - AFFICHÉE DYNAMIQUEMENT) ====================
+
+    # ==================== GLM ====================
     html.Div(id='glm-analysis-container', children=[
-        html.H3(" GLM Analysis", className="mb-4"),
-        
-        # Sélection des sujets
+
+        section_title("GLM Analysis"),
+
         dbc.Card([
-            dbc.CardHeader("Subject Selection"),
+            dbc.CardHeader("Subject Selection", style=CARD_HEADER_STYLE),
             dbc.CardBody([
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Session"),
+                        html.Label("Session", className="fw-semibold small text-secondary mb-1"),
                         dcc.Dropdown(id='glm-session', options=[], value='V1')
                     ], width=4),
                     dbc.Col([
-                        dbc.Label("Sex Filter"),
+                        html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
                         dcc.Dropdown(id='glm-sex', options=[], value='all')
                     ], width=4),
                     dbc.Col([
-                        dbc.Label("Subject Groups"),
+                        html.Label("Subject Groups", className="fw-semibold small text-secondary mb-1"),
                         dcc.Checklist(id='glm-groups', options=[], value=[], inline=True)
                     ], width=4)
                 ]),
-                html.Br(),
-                html.Div(id='glm-subject-count', className='text-muted')
+                html.Div(id='glm-subject-count', className='text-muted small mt-2'),
+
+                html.Div(id='glm-personalized-container', children=[
+                html.Label("Select subjects manually (minimum 3 per group)",
+                        className="fw-semibold small text-secondary mb-1"),
+                dcc.Dropdown(
+                    id='glm-subjects-personalized',
+                    options=[],
+                    multi=True,
+                    placeholder="Click to select subjects — each can be removed with ×"
+                ),
+                html.Div(id='glm-personalized-warning', className="mt-1")
+            ], style={'display': 'none'})
             ])
-        ], className="mb-4"),
-        # Configuration de base
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
         dbc.Card([
-            dbc.CardHeader("Analysis Configuration"),
+            dbc.CardHeader("Analysis Configuration", style=CARD_HEADER_STYLE),
             dbc.CardBody([
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Distribution Family"),
+                        html.Label("Distribution Family", className="fw-semibold small text-secondary mb-1"),
                         dcc.Dropdown(
                             id='glm-distribution',
                             options=[
@@ -2538,7 +2676,7 @@ app.layout = dbc.Container([
                         )
                     ], width=4),
                     dbc.Col([
-                        dbc.Label("Link Function"),
+                        html.Label("Link Function", className="fw-semibold small text-secondary mb-1"),
                         dcc.Dropdown(
                             id='glm-link',
                             options=[
@@ -2551,24 +2689,21 @@ app.layout = dbc.Container([
                         )
                     ], width=4),
                     dbc.Col([
-                        dbc.Label("Tweedie Power (if applicable)"),
+                        html.Label("Tweedie Power", className="fw-semibold small text-secondary mb-1"),
                         dcc.Input(
                             id='glm-tweedie-power',
                             type='number',
-                            value=1.5,
-                            step=0.1,
-                            min=0,
-                            max=3,
-                            disabled=True
+                            value=1.5, step=0.1, min=0, max=3,
+                            disabled=True,
+                            style={'width': '100%'}
                         )
                     ], width=4)
                 ], className="mb-3"),
-                
                 dbc.Row([
                     dbc.Col([
                         dbc.Checklist(
                             id='glm-interaction',
-                            options=[{"label": " Include Interaction", "value": True}],
+                            options=[{"label": "Include Interaction", "value": True}],
                             value=[]
                         )
                     ], width=6),
@@ -2580,38 +2715,26 @@ app.layout = dbc.Container([
                             disabled=True
                         )
                     ], width=6)
-                ], className="mb-3")
+                ])
             ])
-        ], className="mb-4"),
-        
-        # Sélection des variables
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
         dbc.Card([
-            dbc.CardHeader("Variable Selection"),
+            dbc.CardHeader("Variable Selection", style=CARD_HEADER_STYLE),
             dbc.CardBody([
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Outcome Variables"),
-                        dcc.Dropdown(
-                            id='glm-outcomes',
-                            options=[],
-                            multi=True,
-                            placeholder="Select dependent variables"
-                        )
+                        html.Label("Outcome Variables", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='glm-outcomes', options=[], multi=True, placeholder="Select dependent variables")
                     ], width=6),
                     dbc.Col([
-                        dbc.Label("Covariates"),
-                        dcc.Dropdown(
-                            id='glm-covariates',
-                            options=[],
-                            multi=True,
-                            placeholder="Select covariates"
-                        )
+                        html.Label("Covariates", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='glm-covariates', options=[], multi=True, placeholder="Select covariates")
                     ], width=6)
                 ], className="mb-3"),
-                
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Predictor System"),
+                        html.Label("Predictor System", className="fw-semibold small text-secondary mb-1"),
                         dbc.RadioItems(
                             id='glm-predictor-system',
                             options=[
@@ -2625,55 +2748,55 @@ app.layout = dbc.Container([
                     ], width=12)
                 ])
             ])
-        ], className="mb-4"),
-        
-        # Visualisation des données
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
         dbc.Card([
-            dbc.CardHeader("Data Visualization"),
+            dbc.CardHeader("Data Visualization", style=CARD_HEADER_STYLE),
             dbc.CardBody([
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Select Variable to Visualize"),
+                        html.Label("Variable to Visualize", className="fw-semibold small text-secondary mb-1"),
                         dcc.Dropdown(id='glm-viz-variable', options=[])
                     ], width=4),
                     dbc.Col([
-                        dbc.Label("Color By"),
-                        dcc.Dropdown(
-                            id='glm-viz-color',
-                            options=[{'label': 'None', 'value': 'none'}],
-                            value='none'
-                        )
+                        html.Label("Color By", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='glm-viz-color', options=[{'label': 'None', 'value': 'none'}], value='none')
                     ], width=4),
                     dbc.Col([
+                        html.Br(),
                         dbc.Checklist(
                             id='glm-viz-points',
-                            options=[{"label": " Show Individual Points", "value": True}],
+                            options=[{"label": "Show Individual Points", "value": True}],
                             value=[True]
                         )
                     ], width=4)
-                ]),
+                ], className="mb-2"),
                 dcc.Graph(id='glm-viz-plot')
             ])
-        ], className="mb-4"),
-        
-        # Bouton d'exécution
-        dbc.Button(" Run GLM Analysis", id='run-glm-analysis', color="primary", className="mb-4"),
-        
-        # Résultats
-        html.Div(id='glm-results-container')
-    ], style={'display': 'none'}),  # Caché par défaut
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
 
-     # ==================== SECTION T-TEST (CACHÉE - AFFICHÉE DYNAMIQUEMENT) ====================
+        dbc.Button(
+            "Run GLM Analysis",
+            id='run-glm-analysis',
+            className="mb-4",
+            style={'backgroundColor': COLORS['primary'], 'border': 'none', 'padding': '10px 24px', 'fontWeight': '500'}
+        ),
+
+        html.Div(id='glm-results-container')
+
+    ], style={'display': 'none'}),
+
+    # ==================== T-TEST ====================
     html.Div(id='ttest-analysis-container', children=[
-        html.H3(" T-Test Analysis", className="mb-4"),
-        
-        # Configuration de base
+
+        section_title("T-Test Analysis"),
+
         dbc.Card([
-            dbc.CardHeader("T-Test Configuration"),
+            dbc.CardHeader("Test Configuration", style=CARD_HEADER_STYLE),
             dbc.CardBody([
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Test Type"),
+                        html.Label("Test Type", className="fw-semibold small text-secondary mb-1"),
                         dcc.RadioItems(
                             id='ttest-type',
                             options=[
@@ -2684,209 +2807,201 @@ app.layout = dbc.Container([
                             inline=True
                         )
                     ], width=6),
-                    dbc.Col([
-                        dbc.Label("Dataset for Analysis"),
-                        dcc.RadioItems(
-                            id='ttest-dataset',
-                            options=[
-                                {'label': 'Dataset 1', 'value': 'dataset1'},
-                                {'label': 'Dataset 2', 'value': 'dataset2'},
-                                {'label': 'Master', 'value': 'master-store'}
-                            ],
-                            value='dataset1',
-                            inline=True
-                        )
-                    ], width=6)
+                    dcc.Store(id='ttest-both-mode', data='single')
+
                 ])
             ])
-        ], className="mb-4"),
-        
-        # Sélection des groupes
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
         dbc.Card([
-            dbc.CardHeader("Group Selection"),
+            dbc.CardHeader("Group Selection", style=CARD_HEADER_STYLE),
             dbc.CardBody([
                 dbc.Row([
                     dbc.Col([
-                        dbc.Label("Group 1 Configuration"),
-                        html.Div([
-                            dbc.Label("Session"),
-                            dcc.Dropdown(id='ttest-group1-session', options=[], value='V1'),
-                            html.Br(),
-                            dbc.Label("Sex Filter"),
-                            dcc.Dropdown(id='ttest-group1-sex', options=[], value='all'),
-                            html.Br(),
-                            dbc.Label("Subject Groups"),
-                            dcc.Checklist(id='ttest-group1-groups', options=[], value=[], inline=True),
-                            html.Br(),
-                            html.Div(id='ttest-group1-count', className='text-muted')
-                        ])
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Group 2 Configuration"),
-                        html.Div([
-                            dbc.Label("Session"),
-                            dcc.Dropdown(id='ttest-group2-session', options=[], value='V1'),
-                            html.Br(),
-                            dbc.Label("Sex Filter"),
-                            dcc.Dropdown(id='ttest-group2-sex', options=[], value='all'),
-                            html.Br(),
-                            dbc.Label("Subject Groups"),
-                            dcc.Checklist(id='ttest-group2-groups', options=[], value=[], inline=True),
-                            html.Br(),
-                            html.Div(id='ttest-group2-count', className='text-muted')
-                        ])
-                    ], width=6)
-                ])
-            ])
-        ], className="mb-4"),
-        
-        # Sélection des variables
-        dbc.Card([
-            dbc.CardHeader("Variable Selection"),
-            dbc.CardBody([
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Variables to Compare"),
+                        html.H6("Group 1", style={'color': COLORS['primary'], 'fontWeight': '500'}),
+                        html.Label("Session", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='ttest-group1-session', options=[], value='V1', className="mb-2"),
+                        html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='ttest-group1-sex', options=[], value='all', className="mb-2"),
+                        html.Label("Subject Groups", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Checklist(id='ttest-group1-groups', options=[], value=[], inline=True),
+                        html.Div(id='ttest-group1-count', className='text-muted small mt-1'),
+                        html.Div(id='ttest-personalized-container_1', children=[
+                        html.Label("Select subjects manually",
+                                className="fw-semibold small text-secondary mb-1"),
                         dcc.Dropdown(
-                            id='ttest-variables',
+                            id='ttest-subjects-personalized_1',
                             options=[],
                             multi=True,
-                            placeholder="Select variables for comparison"
-                        )
-                    ], width=12)
+                            placeholder="Click to select subjects — each can be removed with ×"
+                        ),
+                        html.Div(id='ttest-personalized-warning_1', className="mt-1")
+                    ], style={'display': 'none'})
+                    ], width=6),
+                    dbc.Col([
+                        html.H6("Group 2", style={'color': COLORS['secondary'], 'fontWeight': '500'}),
+                        html.Label("Session", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='ttest-group2-session', options=[], value='V1', className="mb-2"),
+                        html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(id='ttest-group2-sex', options=[], value='all', className="mb-2"),
+                        html.Label("Subject Groups", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Checklist(id='ttest-group2-groups', options=[], value=[], inline=True),
+
+                        html.Div(id='ttest-group2-count', className='text-muted small mt-1'),
+                        html.Div(id='ttest-personalized-container_2', children=[  
+                            html.Label("Select subjects manually",
+                                    className="fw-semibold small text-secondary mb-1"),
+                            dcc.Dropdown(
+                                id='ttest-subjects-personalized_2',
+                                options=[],
+                                multi=True,
+                                placeholder="Click to select subjects — each can be removed with ×"
+                            ),
+                            html.Div(id='ttest-personalized-warning_2', className="mt-1")
+                        ], style={'display': 'none'})
+                        ], width=6)
                 ])
             ])
-        ], className="mb-4"),
-        
-        # Bouton d'exécution
-        dbc.Button(" Run T-Test Analysis", id='run-ttest-analysis', color="success", className="mb-4"),
-        
-        # Résultats
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
+        dbc.Card([
+            dbc.CardHeader("Variable Selection", style=CARD_HEADER_STYLE),
+            dbc.CardBody([
+                html.Label("Variables to Compare", className="fw-semibold small text-secondary mb-1"),
+                dcc.Dropdown(id='ttest-variables', options=[], multi=True, placeholder="Select variables for comparison")
+            ])
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
+        dbc.Button(
+            "Run T-Test Analysis",
+            id='run-ttest-analysis',
+            className="mb-4",
+            style={'backgroundColor': COLORS['secondary'], 'border': 'none', 'padding': '10px 24px', 'fontWeight': '500'}
+        ),
+
         html.Div(id='ttest-results-container'),
-        # Store pour les données (ajoutez cette ligne)
         dcc.Store(id='ttest-cleaned-data-store')
+
     ], style={'display': 'none'}),
 
-    # ==================== SECTION CORRELATION (CACHÉE - AFFICHÉE DYNAMIQUEMENT) ====================
+    # ==================== CORRELATION ====================
     html.Div(id='correlation-analysis-container', children=[
-    html.H3(" Correlation Analysis", className="mb-4"),
-    
-    # Sélection des sujets PAR SET
-    dbc.Card([
-        dbc.CardHeader("Subject Selection by Set"),
-        dbc.CardBody([
-            dbc.Row([
-                # SET 1
-                dbc.Col([
-                    html.H5("Set 1 Subjects", className="text-primary"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Session"),
+
+        section_title("Correlation Analysis"),
+
+        dbc.Card([
+            dbc.CardHeader("Subject Selection by Set", style=CARD_HEADER_STYLE),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        html.H6("Set 1 Subjects", style={'color': COLORS['primary'], 'fontWeight': '500'}),
+                        dbc.Row([
+                            dbc.Col([
+                                html.Label("Session", className="fw-semibold small text-secondary mb-1"),
+                                dcc.Dropdown(id='corr-session1', options=[], value='V1', placeholder="Session for Set 1")
+                            ], width=6),
+                            dbc.Col([
+                                html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
+                                dcc.Dropdown(id='corr-sex1', options=[], value='all', placeholder="Sex for Set 1")
+                            ], width=6),
+                            html.Div(id='corr-personalized-container_1', children=[
+                            html.Label("Select subjects manually",
+                                    className="fw-semibold small text-secondary mb-1"),
                             dcc.Dropdown(
-                                id='corr-session1', 
-                                options=[], 
-                                value='V1',
-                                placeholder="Select session for Set 1"
-                            )
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Sex Filter"),
-                            dcc.Dropdown(
-                                id='corr-sex1', 
-                                options=[], 
-                                value='all',
-                                placeholder="Select sex for Set 1"
-                            )
-                        ], width=6)
-                    ]),
-                    dbc.Label("Subject Groups"),
-                    dcc.Checklist(id='corr-groups1', options=[], value=[], inline=True),
-                    html.Br(),
-                    html.Div(id='corr-subject-count1', className='text-muted small')
-                ], width=6),
-                
-                # SET 2
-                dbc.Col([
-                    html.H5("Set 2 Subjects", className="text-success"),
-                    dbc.Row([
-                        dbc.Col([
-                            dbc.Label("Session"),
-                            dcc.Dropdown(
-                                id='corr-session2', 
-                                options=[], 
-                                value='V1',
-                                placeholder="Select session for Set 2"
-                            )
-                        ], width=6),
-                        dbc.Col([
-                            dbc.Label("Sex Filter"),
-                            dcc.Dropdown(
-                                id='corr-sex2', 
-                                options=[], 
-                                value='all',
-                                placeholder="Select sex for Set 2"
-                            )
-                        ], width=6)
-                    ]),
-                    dbc.Label("Subject Groups"),
-                    dcc.Checklist(id='corr-groups2', options=[], value=[], inline=True),
-                    html.Br(),
-                    html.Div(id='corr-subject-count2', className='text-muted small')
-                ], width=6)
+                                id='corr-subjects-personalized_1',
+                                options=[],
+                                multi=True,
+                                placeholder="Click to select subjects — each can be removed with ×"
+                            ),
+                            html.Div(id='corr-personalized-warning_1', className="mt-1")
+                        ], style={'display': 'none'})
+                        ], className="mb-2"),
+                        html.Label("Subject Groups", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Checklist(id='corr-groups1', options=[], value=[], inline=True),
+                        html.Div(id='corr-subject-count1', className='text-muted small mt-1')
+                    ], width=6),
+                    dbc.Col([
+                        html.H6("Set 2 Subjects", style={'color': COLORS['secondary'], 'fontWeight': '500'}),
+                        dbc.Row([
+                            dbc.Col([
+                                html.Label("Session", className="fw-semibold small text-secondary mb-1"),
+                                dcc.Dropdown(id='corr-session2', options=[], value='V1', placeholder="Session for Set 2")
+                            ], width=6),
+                            dbc.Col([
+                                html.Label("Sex Filter", className="fw-semibold small text-secondary mb-1"),
+                                dcc.Dropdown(id='corr-sex2', options=[], value='all', placeholder="Sex for Set 2")
+                            ], width=6)
+                        ], className="mb-2"),
+                        html.Div(id='corr-personalized-container_2', children=[
+                        html.Label("Select subjects manually",
+                                className="fw-semibold small text-secondary mb-1"),
+                        dcc.Dropdown(
+                            id='corr-subjects-personalized_2',
+                            options=[],
+                            multi=True,
+                            placeholder="Click to select subjects — each can be removed with ×"
+                        ),
+                        html.Div(id='corr-personalized-warning_2', className="mt-1")
+                    ], style={'display': 'none'}),
+                        html.Label("Subject Groups", className="fw-semibold small text-secondary mb-1"),
+                        dcc.Checklist(id='corr-groups2', options=[], value=[], inline=True),
+                        html.Div(id='corr-subject-count2', className='text-muted small mt-1')
+                    ], width=6)
+                ])
             ])
-        ])
-    ], className="mb-4"),
-    
-    # Sélection des variables par sets
-    dbc.Card([
-        dbc.CardHeader("Variable Selection by Sets"),
-        dbc.CardBody([
-            dbc.Row([
-                # SET 1
-                dbc.Col([
-                    html.H5("Set 1 Variables", className="text-primary"),
-                    dbc.Label("Variable Type for Set 1"),
-                    dcc.RadioItems(
-                        id='corr-system-type1',
-                        options=[
-                            {'label': 'Synaptic Ratios', 'value': 'Synaptic ratio'},
-                            {'label': 'Neurotransmitter (Lesion)', 'value': 'Neurotransmitter (Loc)'},
-                            {'label': 'Neurotransmitter (Tract)', 'value': 'Neurotransmitter (Tract)'},
-                            {'label': 'Clinical Outcomes', 'value': 'Clinical Outcomes'}
-                        ],
-                        value='Synaptic ratio',
-                        inline=False
-                    )
-                ], width=6),
-                
-                # SET 2
-                dbc.Col([
-                    html.H5("Set 2 Variables", className="text-success"),
-                    dbc.Label("Variable Type for Set 2"),
-                    dcc.RadioItems(
-                        id='corr-system-type2',
-                        options=[
-                            {'label': 'Synaptic Ratios', 'value': 'Synaptic ratio'},
-                            {'label': 'Neurotransmitter (Lesion)', 'value': 'Neurotransmitter (Loc)'},
-                            {'label': 'Neurotransmitter (Tract)', 'value': 'Neurotransmitter (Tract)'},
-                            {'label': 'Clinical Outcomes', 'value': 'Clinical Outcomes'}
-                        ],
-                        value='Clinical Outcomes',
-                        inline=False
-                    )
-                ], width=6)
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
+        dbc.Card([
+            dbc.CardHeader("Variable Selection by Set", style=CARD_HEADER_STYLE),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        html.H6("Set 1 Variables", style={'color': COLORS['primary'], 'fontWeight': '500'}),
+                        html.Label("Variable Type", className="fw-semibold small text-secondary mb-1"),
+                        dcc.RadioItems(
+                            id='corr-system-type1',
+                            options=[
+                                {'label': 'Synaptic Ratios', 'value': 'Synaptic ratio'},
+                                {'label': 'Neurotransmitter (Lesion)', 'value': 'Neurotransmitter (Loc)'},
+                                {'label': 'Neurotransmitter (Tract)', 'value': 'Neurotransmitter (Tract)'},
+                                {'label': 'Clinical Outcomes', 'value': 'Clinical Outcomes'}
+                            ],
+                            value='Synaptic ratio',
+                            inline=False
+                        )
+                    ], width=6),
+                    dbc.Col([
+                        html.H6("Set 2 Variables", style={'color': COLORS['secondary'], 'fontWeight': '500'}),
+                        html.Label("Variable Type", className="fw-semibold small text-secondary mb-1"),
+                        dcc.RadioItems(
+                            id='corr-system-type2',
+                            options=[
+                                {'label': 'Synaptic Ratios', 'value': 'Synaptic ratio'},
+                                {'label': 'Neurotransmitter (Lesion)', 'value': 'Neurotransmitter (Loc)'},
+                                {'label': 'Neurotransmitter (Tract)', 'value': 'Neurotransmitter (Tract)'},
+                                {'label': 'Clinical Outcomes', 'value': 'Clinical Outcomes'}
+                            ],
+                            value='Clinical Outcomes',
+                            inline=False
+                        )
+                    ], width=6)
+                ])
             ])
-        ])
-    ], className="mb-4"),
-        
-        # Bouton d'exécution
-        dbc.Button(" Run Correlation Analysis", id='run-corr-analysis', color="info", className="mb-4"),
-        
-        # Résultats
+        ], className="mb-3 shadow-sm", style=CARD_STYLE),
+
+        dbc.Button(
+            "Run Correlation Analysis",
+            id='run-corr-analysis',
+            className="mb-4",
+            style={'backgroundColor': '#5B8DB8', 'border': 'none', 'padding': '10px 24px', 'fontWeight': '500'}
+        ),
+
         html.Div(id='corr-results-container')
+
     ], style={'display': 'none'}),
 
-], fluid=True, style={'background-color': '#f8f8f0'})
+], fluid=True, style={'backgroundColor': COLORS['background'], 'minHeight': '100vh', 'padding': '0 16px 40px 16px'})
+
 
 # # ==================== CALLBACKS ====================
 @app.callback(
@@ -2954,6 +3069,16 @@ def process_uploads(contents1, contents2, filename1, filename2):
     
     return df1_data, df2_data, html.Div(status_messages)
 
+@app.callback(
+    [Output("upload-collapse", "is_open"),
+     Output("upload-toggle-icon", "children")],
+    Input("upload-collapse-btn", "n_clicks"),
+    State("upload-collapse", "is_open"),
+    prevent_initial_call=True
+)
+def toggle_upload(n, is_open):
+    return not is_open, "▸" if is_open else "▾"
+
 def create_visualization_tab(df1, df2):
     """Onglet Visualisation - SEULEMENT les graphiques et options d'affichage"""
     return html.Div([
@@ -2961,14 +3086,14 @@ def create_visualization_tab(df1, df2):
         
         # Graphiques (les mêmes IDs que dans votre layout principal)
         dbc.Row([
-            dbc.Col(dcc.Graph(id='graph1', 
-                             figure={}, 
+            dbc.Col(dcc.Graph(id='graph1',
+                             figure=EMPTY_FIG,
                              config={'displayModeBar': True}), width=4),
-            dbc.Col(dcc.Graph(id='graph2', 
-                             figure={}, 
+            dbc.Col(dcc.Graph(id='graph2',
+                             figure=EMPTY_FIG,
                              config={'displayModeBar': True}), width=4),
-            dbc.Col(dcc.Graph(id='graph3', 
-                             figure={}, 
+            dbc.Col(dcc.Graph(id='graph3',
+                             figure=EMPTY_FIG,
                              config={'displayModeBar': True}), width=4)
         ]),
         
@@ -2994,56 +3119,81 @@ def create_visualization_tab(df1, df2):
       ])
 
 def create_statistics_tab(df1, df2):
-    """Onglet Statistiques avec sélection des groupes de sujets"""
+    """Onglet Statistiques — les contrôles sont dans le layout statique en dessous"""
     return html.Div([
-
-        html.H3(" Statistical Analysis"),
-
-        # Conteneur qui recevra les éléments statistiques
-        html.Div(id='stats-method-container', className="mb-3"),
-        html.Div(id='stats-dataset-container',className="mb-3"),
-        html.Div(id='stats-analysis-type-container',className="mb-3"),
-
-        # Contrôles dynamiques pour la sélection des sujets
-        html.Div(id='stats-subject-selection'),# className="mb-3"),
-        
-        # Contrôles spécifiques à la méthode
-        html.Div(id='stats-method-controls'), #, className="mb-3"),
-        
-        # Résultats
-        html.Div(id='stats-results') #, className="mt-3")
+        html.P(
+            "Select an analysis method below to get started.",
+            className="text-muted",
+            style={'fontSize': '13px', 'fontStyle': 'italic'}
+        )
     ])
+    # """Onglet Statistiques avec sélection des groupes de sujets"""
+    # return html.Div([
+
+    #     html.H3(" Statistical Analysis"),
+
+    #     # Conteneur qui recevra les éléments statistiques
+    #     html.Div(id='stats-method-container', className="mb-3"),
+    #     html.Div(id='stats-dataset-container',className="mb-3"),
+    #     html.Div(id='stats-analysis-type-container',className="mb-3"),
+
+    #     # Contrôles dynamiques pour la sélection des sujets
+    #     html.Div(id='stats-subject-selection'),# className="mb-3"),
+        
+    #     # Contrôles spécifiques à la méthode
+    #     html.Div(id='stats-method-controls'), #, className="mb-3"),
+        
+    #     # Résultats
+    #     html.Div(id='stats-results') #, className="mt-3")
+    # ])
 
 def create_data_explorer_tab(df1, df2):
     """Onglet Explorateur de données"""
+    options = []
+    if df1 is not None:
+        options.append({'label': f'Dataset 1 ({len(df1)} subjects)', 'value': 'dataset1'})
+    options.append({
+        'label': f'Dataset 2 — article data ({len(df2)} subjects)' if df2 is not None else 'Dataset 2 (N/A)',
+        'value': 'dataset2',
+        'disabled': df2 is None
+    })
+    default = 'dataset2' if df1 is None else 'dataset1'
+
     return html.Div([
-        html.H3(" Data Explorer"),
-        
-        html.Label("Select Dataset to Explore:"),
-        dcc.RadioItems(
-            id='data-explorer-dataset',
-            options=[
-                {'label': f'Dataset 1 ({len(df1)} subjects)' if df1 is not None else 'Dataset 1 (N/A)', 
-                 'value': 'dataset1', 'disabled': df1 is None},
-                {'label': f'Dataset 2 ({len(df2)} subjects)' if df2 is not None else 'Dataset 2 (N/A)', 
-                 'value': 'dataset2', 'disabled': df2 is None}
-            ],
-            value='dataset1' if df1 is not None else 'dataset2',
-            inline=True
-        ),
+        html.H3("Data Explorer"),
+        dcc.RadioItems(id='data-explorer-dataset', options=options, value=default, inline=True),
         html.Div(id='data-explorer-content')
     ])
+    # return html.Div([
+    #     html.H3(" Data Explorer"),
+        
+    #     html.Label("Select Dataset to Explore:"),
+    #     dcc.RadioItems(
+    #         id='data-explorer-dataset',
+    #         options=[
+    #             {'label': f'Dataset 1 ({len(df1)} subjects)' if df1 is not None else 'Dataset 1 (N/A)', 
+    #              'value': 'dataset1', 'disabled': df1 is None},
+    #             {'label': f'Dataset 2 ({len(df2)} subjects)' if df2 is not None else 'Dataset 2 (N/A)', 
+    #              'value': 'dataset2', 'disabled': df2 is None}
+    #         ],
+    #         value='dataset1' if df1 is not None else 'dataset2',
+    #         inline=True
+    #     ),
+    #     html.Div(id='data-explorer-content')
+    # ])
 
 # Callback pour gérer le contenu des tabs
 @app.callback(
     Output('tab-content', 'children'),
     [Input('tabs', 'active_tab'),
      Input('dataset1-store', 'data'),
-     Input('dataset2-store', 'data')]
+     Input('dataset2-store', 'data')],
+    [State('master-store', 'data')]  
 )
-def render_tab_content(active_tab, data1, data2):
+def render_tab_content(active_tab, data1, data2,master_store):
     """Affiche le contenu selon l'onglet actif"""
-    if not data1 and not data2:
+    data2_or_master = data2 if data2 else master_store
+    if not data1 and not data2_or_master:
         return html.Div([
             dbc.Alert("Please upload data first to access this functionality.", 
                      color="info", className="text-center")
@@ -3130,16 +3280,17 @@ def toggle_selection_containers(analysis_type):
      Output('group-checklist', 'options'),
      Output('group-checklist', 'value')],
     [Input('dataset-selector', 'value'),
-     Input('analysis-type', 'value')],
-    #  Input('dataset1-store', 'data'), 
-    #  Input('dataset2-store', 'data')],
-    [State('dataset1-store', 'data'),
-     State('dataset2-store', 'data'),
-     State('data-source', 'value'),
-     State('master-store', 'data')],
+    Input('analysis-type', 'value'),
+    Input('dataset1-store', 'data'),   
+    Input('dataset2-store', 'data'),
+    Input('master-store', 'data')],
+    [#State('dataset1-store', 'data'),
+     #State('dataset2-store', 'data'),
+     State('data-source', 'value')],
+     #State('master-store', 'data')],
      prevent_initial_call=False
 )
-def update_all_options(dataset_sel, analysis_type, data1, data2, data_source, master_store):
+def update_all_options(dataset_sel, analysis_type, data1, data2, master_store, data_source):
     """Met à jour toutes les options des composants selon le dataset sélectionné"""
     
     # Sélectionner le dataset approprié
@@ -3582,7 +3733,8 @@ def update_overlay_count(session, sex_filter, selected_groups, selected_subject,
     [Output('graph1', 'figure', allow_duplicate=True),
      Output('graph2', 'figure', allow_duplicate=True),
      Output('graph3', 'figure', allow_duplicate=True),
-     Output('profile-title-overlay', 'children')],
+     Output('profile-title-overlay', 'children'),
+     Output('overlay-subjects-store', 'data')],
     Input('add-overlay-btn', 'n_clicks'),
     [State('overlay-analysis-type', 'value'),
      State('overlay-dataset-selector', 'value'),
@@ -3594,12 +3746,13 @@ def update_overlay_count(session, sex_filter, selected_groups, selected_subject,
      State('dataset2-store', 'data'),
      State('data-source', 'value'),
      State('master-store', 'data'),
-     State('plots-store', 'data')],  # Graphiques de base
+     State('plots-store', 'data'),
+     State('overlay-subjects-store', 'data')],
     prevent_initial_call=True
 )
 def add_overlay_to_plots(n_clicks, overlay_analysis_type, overlay_dataset_sel,
                         overlay_subject, overlay_session, overlay_sex_filter, overlay_groups,
-                        data1, data2, data_source, master_store, base_plots_data):
+                        data1, data2, data_source, master_store, base_plots_data, existing_overlay_subjects):
     """Ajoute l'overlay aux graphiques existants"""
     
     if not n_clicks or not base_plots_data:
@@ -3683,16 +3836,17 @@ def add_overlay_to_plots(n_clicks, overlay_analysis_type, overlay_dataset_sel,
         fig2_base.update_layout(barmode='overlay')
         fig3_base.update_layout(barmode='overlay')
         
-        return fig1_base, fig2_base, fig3_base, overlay_title
-        
+        all_overlay_subjects = list(set((existing_overlay_subjects or []) + overlay_subjects))
+        return fig1_base, fig2_base, fig3_base, overlay_title, all_overlay_subjects
+
     except Exception as e:
         print(f"Overlay error: {e}")
-        # Retourner les graphiques de base en cas d'erreur
         return (
             go.Figure(base_plots_data['fig1']),
             go.Figure(base_plots_data['fig2']),
             go.Figure(base_plots_data['fig3']),
-            "Overlay error"
+            "Overlay error",
+            existing_overlay_subjects or []
         )
 
 # Callback pour effacer les overlays
@@ -3700,22 +3854,24 @@ def add_overlay_to_plots(n_clicks, overlay_analysis_type, overlay_dataset_sel,
     [Output('graph1', 'figure', allow_duplicate=True),
      Output('graph2', 'figure', allow_duplicate=True),
      Output('graph3', 'figure', allow_duplicate=True),
-     Output('profile-title-overlay', 'children', allow_duplicate=True)],
+     Output('profile-title-overlay', 'children', allow_duplicate=True),
+     Output('overlay-subjects-store', 'data', allow_duplicate=True)],
     Input('clear-overlay-btn', 'n_clicks'),
     State('plots-store', 'data'),
     prevent_initial_call=True
 )
 def clear_overlays(n_clicks, base_plots_data):
     """Efface tous les overlays et retourne aux graphiques de base"""
-    
+
     if not n_clicks or not base_plots_data:
         raise dash.exceptions.PreventUpdate
-    
+
     return (
         go.Figure(base_plots_data['fig1']),
         go.Figure(base_plots_data['fig2']),
         go.Figure(base_plots_data['fig3']),
-        "No overlay"
+        "No overlay",
+        []
     )
 
 
@@ -3724,36 +3880,67 @@ def clear_overlays(n_clicks, base_plots_data):
 @app.callback(
     Output('data-table-container', 'children'),
     [Input('show-data', 'value'),
-     Input('plots-store', 'data')],
+     Input('plots-store', 'data'),
+     Input('overlay-subjects-store', 'data')],
     [State('dataset1-store', 'data'),
-     State('dataset2-store', 'data')]
+     State('dataset2-store', 'data'),
+     State('master-store', 'data')]
 )
-def show_data_table(show_data, plots_data, data1, data2):
+def show_data_table(show_data, plots_data, overlay_subjects, data1, data2, master_store):
     if show_data != 'yes' or not plots_data or 'subjects' not in plots_data:
         return html.Div()
-    
-    # Find which dataset contains the subjects
-    subjects = plots_data['subjects']
+
+    base_subjects = plots_data.get('subjects', [])
+    overlay_subjects = overlay_subjects or []
+    all_subjects = list(dict.fromkeys(base_subjects + overlay_subjects))
+
+    data2_or_master = data2 if data2 else master_store
     df1 = pd.DataFrame(data1) if data1 else pd.DataFrame()
-    df2 = pd.DataFrame(data2) if data2 else pd.DataFrame()
-    
-    # Check which dataset has the subjects
-    if not df1.empty and any(subj in df1['subject'].values for subj in subjects):
-        df = df1[df1['subject'].isin(subjects)]
-    elif not df2.empty and any(subj in df2['subject'].values for subj in subjects):
-        df = df2[df2['subject'].isin(subjects)]
-    else:
+    df2 = pd.DataFrame(data2_or_master) if data2_or_master else pd.DataFrame()
+    df_combined = pd.concat([df1, df2], ignore_index=True).drop_duplicates(subset='subject')
+    df = df_combined[df_combined['subject'].isin(all_subjects)].copy()
+
+    if df.empty:
         return html.Div("No data available for selected subjects")
-    
+
+    df['Plot'] = df['subject'].apply(lambda s: 'Overlay' if s in overlay_subjects else 'Base')
+    cols = ['Plot'] + [c for c in df.columns if c != 'Plot']
+
     return html.Div([
-        html.H5("Selected Subjects Data"),
+        html.H5(f"{len(base_subjects)} base subjects — {len(overlay_subjects)} overlay subjects"),
         dash.dash_table.DataTable(
-            data=df.to_dict('records'),
-            columns=[{'name': col, 'id': col} for col in df.columns],
-            page_size=10,
-            style_table={'overflowX': 'auto'}
+            data=df[cols].to_dict('records'),
+            columns=[{'name': c, 'id': c} for c in cols],
+            page_size=15,
+            style_table={'overflowX': 'auto'},
+            style_data_conditional=[{
+                'if': {'filter_query': '{Plot} = "Overlay"'},
+                'backgroundColor': '#FFF3E0', 'fontStyle': 'italic'
+            }]
         )
     ])
+    # # Find which dataset contains the subjects
+    # subjects = plots_data['subjects']
+    # df1 = pd.DataFrame(data1) if data1 else pd.DataFrame()
+    # df2 = pd.DataFrame(data2) if data2 else pd.DataFrame()
+    
+    # # Check which dataset has the subjects
+    # if not df1.empty and any(subj in df1['subject'].values for subj in subjects):
+    #     df = df1[df1['subject'].isin(subjects)]
+    # elif not df2.empty and any(subj in df2['subject'].values for subj in subjects):
+    #     df = df2[df2['subject'].isin(subjects)]
+    # else:
+    #     return html.Div("No data available for selected subjects")
+    
+    # return html.Div([
+    #     html.H5("Selected Subjects Data"),
+    #     dash.dash_table.DataTable(
+    #         data=df.to_dict('records'),
+    #         columns=[{'name': col, 'id': col} for col in df.columns],
+    #         page_size=10,
+    #         style_table={'overflowX': 'auto'}
+    #     )
+    # ])
 
 
 
@@ -3825,12 +4012,13 @@ def toggle_stats_containers(active_tab, method):
      Output('corr-sex2', 'options'),
      Output('corr-groups2', 'options')],
     [Input('stats-method', 'value'),
-     Input('tabs', 'active_tab')],
-    [State('dataset1-store', 'data'),
-     State('dataset2-store', 'data'),
-     State('master-store', 'data')]
+     Input('tabs', 'active_tab'),
+     Input('stats-dataset', 'value'),
+     Input('dataset1-store', 'data'),
+     Input('dataset2-store', 'data'),
+     Input('master-store', 'data')]
 )
-def update_stats_options(method, active_tab, data1, data2, master_store):
+def update_stats_options(method, active_tab, dataset, data1, data2, master_store):
     """Met à jour les options communes pour toutes les méthodes statistiques"""
     
     # Si on n'est pas dans l'onglet stats, retourner des options vides
@@ -3838,8 +4026,9 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
         empty_options = []
         return [empty_options] * 19
     
-    # Utiliser les données disponibles (priorité à master si disponible)
-    data = master_store if master_store else (data1 if data1 else data2)
+    # dataset2 = master par défaut si rien n'est uploadé
+    df_resolved = get_data_for_analysis(dataset, data1, data2, master_store)
+    data = df_resolved.to_dict('records') if df_resolved is not None else None
     
     if not data:
         empty_options = []
@@ -3873,9 +4062,16 @@ def update_stats_options(method, active_tab, data1, data2, master_store):
     
     var_options = [{'label': col, 'value': col} for col in relevant_vars]
     
-    # Variables catégorielles pour interactions GLM
-    categorical_vars = ['sex'] + [col for col in df.columns if df[col].dtype == 'object' and col != 'subject']
-    interaction_options = [{'label': col, 'value': col} for col in categorical_vars if col in df.columns]
+    # Variables d'interaction GLM : catégorielles + variables cliniques numériques
+    exclude_from_interaction = {'subject'} | set(relevant_vars)
+    interaction_candidates = []
+    seen = set()
+    for col in df.columns:
+        if col in exclude_from_interaction or col in seen:
+            continue
+        seen.add(col)
+        interaction_candidates.append(col)
+    interaction_options = [{'label': col, 'value': col} for col in interaction_candidates]
     
     return (
         # GLM
@@ -3962,7 +4158,8 @@ def update_glm_subject_count(session, sex_filter, groups, dataset, data1, data2,
      Input('ttest-group2-session', 'value'),
      Input('ttest-group2-sex', 'value'),
      Input('ttest-group2-groups', 'value'),
-     Input('ttest-dataset', 'value')],
+     Input('stats-dataset', 'value')],
+     #Input('ttest-dataset', 'value')],
     [State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')]
@@ -4026,14 +4223,137 @@ def toggle_interaction_var(interaction_enabled):
     """Active/désactive la sélection de variable d'interaction"""
     return not bool(interaction_enabled)
 
+#================================= T-Test / Correlation — personalized subject mode =================================
+
+@app.callback(
+    [Output('ttest-personalized-container_1', 'style'),
+     Output('ttest-personalized-container_2', 'style'),
+     Output('ttest-group1-session', 'style'),
+     Output('ttest-group1-sex', 'style'),
+     Output('ttest-group1-groups', 'style'),
+     Output('ttest-group2-session', 'style'),
+     Output('ttest-group2-sex', 'style'),
+     Output('ttest-group2-groups', 'style')],
+    Input('stats-analysis-type', 'value')
+)
+def toggle_ttest_subject_mode(analysis_type):
+    if analysis_type == 'personalized':
+        show = {'display': 'block'}
+        hide = {'display': 'none'}
+        return show, show, hide, hide, hide, hide, hide, hide
+    hide = {'display': 'none'}
+    show = {'display': 'block'}
+    return hide, hide, show, show, show, show, show, show
+
+@app.callback(
+    [Output('ttest-subjects-personalized_1', 'options'),
+     Output('ttest-subjects-personalized_2', 'options')],
+    [Input('stats-dataset', 'value'),
+     Input('stats-analysis-type', 'value')],
+    [State('dataset1-store', 'data'),
+     State('dataset2-store', 'data'),
+     State('master-store', 'data')]
+)
+def populate_personalized_subjects_ttest(dataset, analysis_type, data1, data2, master_store):
+    if analysis_type != 'personalized':
+        return [], []
+    df = get_data_for_analysis(dataset, data1, data2, master_store)
+    if df is None:
+        return [], []
+    options = [{'label': s, 'value': s} for s in sorted(df['subject'].unique())]
+    return options, options
+
+@app.callback(
+    [Output('corr-personalized-container_1', 'style'),
+     Output('corr-personalized-container_2', 'style'),
+     Output('corr-session1', 'style'),
+     Output('corr-sex1', 'style'),
+     Output('corr-groups1', 'style'),
+     Output('corr-session2', 'style'),
+     Output('corr-sex2', 'style'),
+     Output('corr-groups2', 'style')],
+    Input('stats-analysis-type', 'value')
+)
+def toggle_corr_subject_mode(analysis_type):
+    if analysis_type == 'personalized':
+        show = {'display': 'block'}
+        hide = {'display': 'none'}
+        return show, show, hide, hide, hide, hide, hide, hide
+    hide = {'display': 'none'}
+    show = {'display': 'block'}
+    return hide, hide, show, show, show, show, show, show
+
+@app.callback(
+    [Output('corr-subjects-personalized_1', 'options'),
+     Output('corr-subjects-personalized_2', 'options')],
+    [Input('stats-dataset', 'value'),
+     Input('stats-analysis-type', 'value')],
+    [State('dataset1-store', 'data'),
+     State('dataset2-store', 'data'),
+     State('master-store', 'data')]
+)
+def populate_personalized_subjects_corr(dataset, analysis_type, data1, data2, master_store):
+    if analysis_type != 'personalized':
+        return [], []
+    df = get_data_for_analysis(dataset, data1, data2, master_store)
+    if df is None:
+        return [], []
+    options = [{'label': s, 'value': s} for s in sorted(df['subject'].unique())]
+    return options, options
 
 #================================= GLM analyses =================================
+#Callback pour afficher Personalized Subject List au lieu de By session and Sex
+@app.callback(
+    [Output('glm-personalized-container', 'style'),
+     Output('glm-session', 'style'),          # cacher session
+     Output('glm-sex', 'style'),              # cacher sex
+     Output('glm-groups', 'style')],          # cacher groups
+    Input('stats-analysis-type', 'value')
+)
+def toggle_glm_subject_mode(analysis_type):
+    if analysis_type == 'personalized':
+        return {'display': 'block'}, {'display': 'none'}, {'display': 'none'}, {'display': 'none'}
+    return {'display': 'none'}, {'display': 'block'}, {'display': 'block'}, {'display': 'block'}
+
+#obtenir les sujets disponibles dans le dropdown du personalized subject list
+@app.callback(
+    Output('glm-subjects-personalized', 'options'),
+    [Input('stats-dataset', 'value'),
+     Input('stats-analysis-type', 'value')],
+    [State('dataset1-store', 'data'),
+     State('dataset2-store', 'data'),
+     State('master-store', 'data')]
+)
+def populate_personalized_subjects_glm(dataset, analysis_type, data1, data2, master_store):
+    if analysis_type != 'personalized':
+        return []
+    df = get_data_for_analysis(dataset, data1, data2, master_store)
+    if df is None:
+        return []
+    subjects = sorted(df['subject'].unique())
+    return [{'label': s, 'value': s} for s in subjects]
+
+#Callback warning for 3 selected subject minimum
+@app.callback(
+    Output('glm-personalized-warning', 'children'),
+    Input('glm-subjects-personalized', 'value')
+)
+def warn_personalized_subjects(selected):
+    if not selected:
+        return html.P("Select at least 3 subjects to run the analysis.",
+                      className="text-muted small")
+    n = len(selected)
+    if n < 3:
+        return dbc.Alert(f"{n} subject(s) selected — minimum 3 required to run the analysis.",
+                         color="warning", className="py-1 small")
+    return dbc.Alert(f"{n} subjects selected.", color="success", className="py-1 small")
 
 # Callback pour exécuter l'analyse GLM
 @app.callback(
     Output('glm-results-container', 'children'),
     Input('run-glm-analysis', 'n_clicks'),
-    [State('glm-session', 'value'),           
+    [State('stats-analysis-type', 'value'),
+     State('glm-session', 'value'),           
      State('glm-sex', 'value'),               
      State('glm-groups', 'value'),            
      State('stats-dataset', 'value'),        
@@ -4045,61 +4365,63 @@ def toggle_interaction_var(interaction_enabled):
      State('glm-outcomes', 'value'),
      State('glm-covariates', 'value'),
      State('glm-predictor-system', 'value'),
+     State('glm-subjects-personalized', 'value'),
      State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')],
     prevent_initial_call=True
 )
-def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
+def run_glm_analysis_callback(n_clicks, stats_analysis_type, session, sex_filter, groups, dataset,
                              distribution, link, tweedie_power, interaction, 
-                             interaction_var, outcomes, covariates, predictor_system,
+                             interaction_var, outcomes, covariates, predictor_system,personalized_subjects,
                              data1, data2, master_store):
     """Exécute l'analyse GLM avec filtrage des sujets"""
     
     if not n_clicks or not outcomes:
         return html.Div("Select outcomes and click Run GLM Analysis")
     
-    # Sélectionner les données selon le dataset choisi
-    if dataset == 'master-store':
-        data = master_store
-    elif dataset == 'dataset1':
-        data = data1
-    else:
-        data = data2
-    
-    if not data:
+  
+    df = get_data_for_analysis(dataset, data1, data2, master_store)
+    if df is None:
         return dbc.Alert("No data available for analysis", color="danger")
-    
-    df = pd.DataFrame(data)
-    
-    # ========== FILTRER LES SUJETS ==========
-    if not session:
-        return dbc.Alert("Please select a session", color="warning")
-    
-    # Filtrer par session
-    selected_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
-    
-    # Filtrer par sexe
-    if sex_filter != 'all' and 'sex' in df.columns:
-        gender = "M" if sex_filter == 'men' else "F"
-        selected_subjects = df[
-            (df['subject'].isin(selected_subjects)) & 
-            (df['sex'] == gender)
-        ]['subject'].tolist()
-    
-    # Filtrer par groupes
-    if groups:
-        selected_subjects = [s for s in selected_subjects if detect_group(s) in groups]
-    
-    # Vérifier le minimum
-    if len(selected_subjects) < 3:
-        return dbc.Alert(
-            f"Insufficient subjects: {len(selected_subjects)} found (minimum 3 required)", 
-            color="danger"
-        )
-    
-    # Filtrer le DataFrame
-    df = df[df['subject'].isin(selected_subjects)]
+  
+    if stats_analysis_type == 'personalized':
+        selected_subjects = personalized_subjects or []
+        if len(selected_subjects) < 3:
+            return dbc.Alert(
+                f"Insufficient subjects: {len(selected_subjects)} selected. "
+                "Minimum 3 subjects required per group to run the analysis.",
+                color="danger"
+            )
+    else:
+        # ========== FILTRER LES SUJETS ==========
+        if not session:
+            return dbc.Alert("Please select a session", color="warning")
+        
+        # Filtrer par session
+        selected_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
+        
+        # Filtrer par sexe
+        if sex_filter != 'all' and 'sex' in df.columns:
+            gender = "M" if sex_filter == 'men' else "F"
+            selected_subjects = df[
+                (df['subject'].isin(selected_subjects)) & 
+                (df['sex'] == gender)
+            ]['subject'].tolist()
+        
+        # Filtrer par groupes
+        if groups:
+            selected_subjects = [s for s in selected_subjects if detect_group(s) in groups]
+        
+        # Vérifier le minimum
+        if len(selected_subjects) < 3:
+            return dbc.Alert(
+                f"Insufficient subjects: {len(selected_subjects)} found (minimum 3 required)", 
+                color="danger"
+            )
+        
+        # Filtrer le DataFrame
+        df = df[df['subject'].isin(selected_subjects)]
     
     try:
         # Configurer la famille et le lien
@@ -4146,9 +4468,15 @@ def run_glm_analysis_callback(n_clicks, session, sex_filter, groups, dataset,
         else:
             available_covariates = []
         
-        # Variable d'interaction
+        # Variable d'interaction — l'ajouter à df_predictors si elle n'y est pas déjà
         interaction_var_to_use = interaction_var if interaction and interaction_var else None
-        
+        if interaction_var_to_use and interaction_var_to_use in df.columns and interaction_var_to_use not in df_predictors.columns:
+            df_predictors = df_predictors.merge(
+                df[['subject', interaction_var_to_use]],
+                on='subject',
+                how='left'
+            )
+
         # Exécuter l'analyse GLM
         results_df, error_messages = run_glm_analysis(
             df_predictors=df_predictors,
@@ -4326,91 +4654,148 @@ def update_glm_viz_options(outcomes, covariates, predictor_system, data1, data2,
      Input('glm-session', 'value'),
      Input('glm-sex', 'value'),
      Input('glm-groups', 'value'),
-     Input('stats-dataset', 'value')],
+     Input('stats-dataset', 'value'),
+     Input('stats-analysis-type', 'value'),
+     Input('glm-subjects-personalized', 'value')],
     [State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')]
 )
-def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter, groups, 
-                       dataset, data1, data2, master_store):
+def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter, groups,
+                       dataset, analysis_type, personalized_subjects,
+                       data1, data2, master_store):
     """Génère le graphique de distribution pour GLM"""
     
     if not selected_var:
         return go.Figure()
     
     # Sélectionner les données
-    if dataset == 'master-store':
-        data = master_store
-    elif dataset == 'dataset1':
-        data = data1
-    else:
-        data = data2
-    
-    if not data:
+    df = get_data_for_analysis(dataset, data1, data2, master_store)
+    if df is None:
         return go.Figure()
+
+    # Filtrer les sujets selon le mode
+    if analysis_type == 'personalized':
+        if not personalized_subjects:
+            return go.Figure()
+        df = df[df['subject'].isin(personalized_subjects)]
+    else:
+        # Détecter la colonne sexe (gère 'sex' M/F et 'Sexe_bin' 0/1)
+        sex_col = None
+        sex_val = None
+        if sex_filter and sex_filter != 'all':
+            if 'sex' in df.columns:
+                sex_col = 'sex'
+                sex_val = 'M' if sex_filter == 'men' else 'F'
+            elif 'Sexe_bin' in df.columns:
+                sex_col = 'Sexe_bin'
+                sex_val = 1 if sex_filter == 'men' else 0
+
+        if session:
+            selected_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
+
+            if sex_col is not None:
+                selected_subjects = df[
+                    (df['subject'].isin(selected_subjects)) &
+                    (df[sex_col] == sex_val)
+                ]['subject'].tolist()
+
+            if groups:
+                selected_subjects = [s for s in selected_subjects if detect_group(s) in groups]
+
+            df = df[df['subject'].isin(selected_subjects)]
     
-    df = pd.DataFrame(data)
-    
-    # Filtrer les sujets
-    if session:
-        selected_subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
-        
-        if sex_filter != 'all' and 'sex' in df.columns:
-            gender = "M" if sex_filter == 'men' else "F"
-            selected_subjects = df[
-                (df['subject'].isin(selected_subjects)) & 
-                (df['sex'] == gender)
-            ]['subject'].tolist()
-        
-        if groups:
-            selected_subjects = [s for s in selected_subjects if detect_group(s) in groups]
-        
-        df = df[df['subject'].isin(selected_subjects)]
-    
-    if selected_var not in df.columns:
+    if selected_var not in df.columns or df.empty:
         return go.Figure()
     
     # Créer le graphique
     fig = go.Figure()
     
     if color_by != 'none' and color_by in df.columns:
-        # Boxplot coloré par variable catégorielle
-        for category in df[color_by].unique():
+        # violin plot coloré par variable catégorielle
+        palette = ['#2C5F8A', '#3A8C6E', '#C97A1A', '#8B4A8A', '#C0392B']
+        for i, category in enumerate(sorted(df[color_by].dropna().unique())):
             category_data = df[df[color_by] == category][selected_var].dropna()
-            
-            fig.add_trace(go.Box(
+            color = palette[i % len(palette)]
+            fig.add_trace(go.Violin(
                 y=category_data,
                 name=str(category),
-                boxpoints='all' if show_points else False,
-                jitter=0.3 if show_points else 0,
-                pointpos=-1.8 if show_points else 0,
-                marker_color='#3498db' if color_by == 'sex' and category in ['M', 'male'] else '#e74c3c',
-                line_color='#3498db' if color_by == 'sex' and category in ['M', 'male'] else '#e74c3c'
+                box_visible=True,
+                meanline_visible=True,
+                points='all' if show_points else False,
+                jitter=0.3,
+                marker=dict(color=color, size=5, opacity=0.7),
+                line_color=color,
+                fillcolor=color,
+                opacity=0.5
             ))
+        # Boxplot coloré par variable catégorielle
+        # for category in df[color_by].unique():
+        #     category_data = df[df[color_by] == category][selected_var].dropna()
+            
+        #     fig.add_trace(go.Box(
+        #         y=category_data,
+        #         name=str(category),
+        #         boxpoints='all' if show_points else False,
+        #         jitter=0.3 if show_points else 0,
+        #         pointpos=-1.8 if show_points else 0,
+        #         marker_color='#3498db' if color_by == 'sex' and category in ['M', 'male'] else '#e74c3c',
+        #         line_color='#3498db' if color_by == 'sex' and category in ['M', 'male'] else '#e74c3c'
+        #     ))
         
         fig.update_layout(
-            title=f"Distribution of {selected_var} by {color_by}",
+            title=dict(text=f"Distribution of {selected_var} by {color_by}", font=dict(size=14)),
             yaxis_title=selected_var,
             xaxis_title=color_by,
-            showlegend=True
+            showlegend=True,
+            violinmode='group'
         )
+            # title=f"Distribution of {selected_var} by {color_by}",
+            # yaxis_title=selected_var,
+            # xaxis_title=color_by,
+            # showlegend=True
+        #)
     else:
-        # Boxplot simple
-        fig.add_trace(go.Box(
+        #violin plot simple
+        fig.add_trace(go.Violin(
             y=df[selected_var].dropna(),
             name=selected_var,
-            boxpoints='all' if show_points else False,
-            jitter=0.3 if show_points else 0,
-            pointpos=-1.8 if show_points else 0,
-            marker_color='#3498db',
-            line_color='#3498db'
+            box_visible=True,
+            meanline_visible=True,
+            points='all' if show_points else False,
+            jitter=0.3,
+            marker=dict(color='#2C5F8A', size=5, opacity=0.7),
+            line_color='#2C5F8A',
+            fillcolor='#2C5F8A',
+            opacity=0.5
         ))
-        
         fig.update_layout(
-            title=f"Distribution of {selected_var}",
+            title=dict(text=f"Distribution of {selected_var}", font=dict(size=14)),
             yaxis_title=selected_var,
             showlegend=False
         )
+    fig.update_layout(
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#FFFFFF',
+        font=dict(family='Arial, sans-serif', size=12),
+        margin=dict(t=50, b=40, l=50, r=20)
+    )
+        # Boxplot simple
+        # fig.add_trace(go.Box(
+        #     y=df[selected_var].dropna(),
+        #     name=selected_var,
+        #     boxpoints='all' if show_points else False,
+        #     jitter=0.3 if show_points else 0,
+        #     pointpos=-1.8 if show_points else 0,
+        #     marker_color='#3498db',
+        #     line_color='#3498db'
+        # ))
+        
+        # fig.update_layout(
+        #     title=f"Distribution of {selected_var}",
+        #     yaxis_title=selected_var,
+        #     showlegend=False
+        #)
     
     return fig
 
@@ -4419,159 +4804,299 @@ def update_glm_viz_plot(selected_var, color_by, show_points, session, sex_filter
 # Callback pour exécuter l'analyse T-Test et afficher les résultats
 @app.callback(
     [Output('ttest-results-container', 'children'),
-    Output('ttest-results-store', 'data')],
+    Output('ttest-results-store', 'data'),
+    Output('ttest-cleaned-data-store', 'data')],
     [Input('run-ttest-analysis', 'n_clicks'),
-     Input('ttest-type', 'value'),
-     Input('ttest-dataset', 'value')],
-    [State('ttest-group1-session', 'value'),
+     Input('ttest-type', 'value')],
+     #Input('stats-dataset', 'value')],
+    [State('stats-analysis-type', 'value'),
+     State('stats-dataset', 'value'),
+     State('ttest-both-mode', 'data'),
+     State('ttest-group1-session', 'value'),
      State('ttest-group1-sex', 'value'),
      State('ttest-group1-groups', 'value'),
      State('ttest-group2-session', 'value'),
      State('ttest-group2-sex', 'value'),
      State('ttest-group2-groups', 'value'),
+     State('ttest-subjects-personalized_1', 'value'),
+     State('ttest-subjects-personalized_2', 'value'),
      State('ttest-variables', 'value'),
      State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')]
 )
-def run_ttest_analysis(n_clicks, test_type, dataset, 
-                      g1_session, g1_sex, g1_groups, 
-                      g2_session, g2_sex, g2_groups, 
+def run_ttest_analysis(n_clicks, test_type, analysis_type, dataset, both_mode,
+                      g1_session, g1_sex, g1_groups,
+                      g2_session, g2_sex, g2_groups,
+                      g1_personalized, g2_personalized,
                       variables, data1, data2, master_store):
     """Exécute l'analyse T-Test et retourne les résultats"""
     
     if n_clicks is None or n_clicks == 0:
-        return html.Div("Configure the parameters and click on ‘Run T-Test Analysis’."), None
-    
-    # Validation des paramètres
-    if not all([g1_session, g2_session]):
-        return dbc.Alert("Please select a session for both groups.", color="warning"), None
-    
+        return html.Div("Configure the parameters and click on 'Run T-Test Analysis'."), None, None
+
     if not variables:
-        return dbc.Alert("Please select at least one variable to compare.", color="warning"), None
-    
-    # Sélectionner les données
-    if dataset == 'master-store':
-        data = master_store
-    elif dataset == 'dataset1':
-        data = data1
-    else:
-        data = data2
-    
-    if not data:
-        return dbc.Alert("No data available for analysis.", color="danger"), None
-    
-    df = pd.DataFrame(data)
-    
-    # Fonction pour obtenir les sujets d'un groupe
-    def get_group_subjects(session, sex_filter, groups):
-        # Filtrer par session
-        subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
-        
-        # Filtrer par sexe
-        if sex_filter != 'all' and 'sex' in df.columns:
-            gender = "M" if sex_filter == 'men' else "F"
-            subjects = df[
-                (df['subject'].isin(subjects)) & 
-                (df['sex'] == gender)
+        return dbc.Alert("Please select at least one variable to compare.", color="warning"), None, None
+
+    paired = (test_type == 'paired')
+
+    if not all([g1_session, g2_session]) and analysis_type != 'personalized':
+        return dbc.Alert("Please select a session for both groups.", color="warning"), None, None
+
+    # ── Fonction de filtrage appliquée à un DataFrame source donné ──
+    def get_group_subjects(source_df, session, sex_filter, groups):
+        subjects = source_df[
+            source_df['subject'].str.contains(f"_ses-{session}")
+        ]['subject'].tolist()
+
+        sex_col = None
+        sex_val = None
+        if sex_filter and sex_filter != 'all':
+            if 'sex' in source_df.columns:
+                sex_col, sex_val = 'sex', ('M' if sex_filter == 'men' else 'F')
+            elif 'Sexe_bin' in source_df.columns:
+                sex_col, sex_val = 'Sexe_bin', (1 if sex_filter == 'men' else 0)
+
+        if sex_col:
+            subjects = source_df[
+                (source_df['subject'].isin(subjects)) &
+                (source_df[sex_col] == sex_val)
             ]['subject'].tolist()
-        
-        # Filtrer par groupes
+
         if groups:
             subjects = [s for s in subjects if detect_group(s) in groups]
         return subjects
-    
-    # Obtenir les sujets pour chaque groupe
-    g1_subjects = get_group_subjects(g1_session, g1_sex, g1_groups)
-    g2_subjects = get_group_subjects(g2_session, g2_sex, g2_groups)
-    
-    if len(g1_subjects) < 3 or len(g2_subjects) < 3:
-        return dbc.Alert(f"Groups too small: Group 1 ={len(g1_subjects)}, Group 2={len(g2_subjects)} (minimum of 3 required)", color="warning"), None
-    
-    # Vérification pour test apparié
-    paired = (test_type == 'paired')
+
+    # ── Sélection des sources selon le mode ──
+    data2_or_master = data2 if data2 else master_store
+
+    if analysis_type == 'personalized':
+        df = get_data_for_analysis(dataset, data1, data2, master_store)
+        if df is None:
+            return dbc.Alert("No data available.", color="danger"), None, None
+        g1_subjects = g1_personalized or []
+        g2_subjects = g2_personalized or []
+        if len(g1_subjects) < 2 or len(g2_subjects) < 2:
+            return dbc.Alert(
+                "Personalized mode: select at least 2 subjects per group.",
+                color="danger"
+            ), None, None
+        df_g1 = df[df['subject'].isin(g1_subjects)]
+        df_g2 = df[df['subject'].isin(g2_subjects)]
+
+    else:
+        # Un seul dataset, deux groupes définis par les filtres
+        df = get_data_for_analysis(dataset, data1, data2, master_store)
+        if df is None:
+            return dbc.Alert("No data available for analysis.", color="danger"), None, None
+
+        g1_subjects = get_group_subjects(df, g1_session, g1_sex, g1_groups)
+        g2_subjects = get_group_subjects(df, g2_session, g2_sex, g2_groups)
+
+        if len(g1_subjects) < 3 or len(g2_subjects) < 3:
+            return dbc.Alert(
+                f"Groups too small: Group 1 = {len(g1_subjects)}, Group 2 = {len(g2_subjects)} (minimum 3 required)",
+                color="warning"), None, None
+
+        df_g1 = df[df['subject'].isin(g1_subjects)]
+        df_g2 = df[df['subject'].isin(g2_subjects)]
+
+    # ── Test apparié ──
     if paired:
-        # Extraire les identifiants de base
-        g1_base_ids = {subj.split('-V')[0] for subj in g1_subjects}
-        g2_base_ids = {subj.split('-V')[0] for subj in g2_subjects}
+        g1_base_ids = {s.split('_ses-')[0] for s in g1_subjects}
+        g2_base_ids = {s.split('_ses-')[0] for s in g2_subjects}
         common_base_ids = g1_base_ids & g2_base_ids
-        
+
         if not common_base_ids:
-            return dbc.Alert("No common subjects found for the paired test.", color="warning"), None
-        
-        # Filtrer pour ne garder que les paires valides
-        g1_subjects = [subj for subj in g1_subjects if subj.split('-V')[0] in common_base_ids]
-        g2_subjects = [subj for subj in g2_subjects if subj.split('-V')[0] in common_base_ids]
-        
+            return dbc.Alert("No common subjects found for the paired test.", color="warning"), None, None
+
+        g1_subjects = [s for s in g1_subjects if s.split('_ses-')[0] in common_base_ids]
+        g2_subjects = [s for s in g2_subjects if s.split('_ses-')[0] in common_base_ids]
+
         if len(common_base_ids) < 3:
-            return dbc.Alert(f"Only {len(common_base_ids)} valid pairs found (minimum of 3 required).", color="warning"), None
-    
-    # Préparer les données
-    df_g1 = df[df['subject'].isin(g1_subjects)]
-    df_g2 = df[df['subject'].isin(g2_subjects)]
-    
-    # Exécuter les analyses pour chaque variable
+            return dbc.Alert(
+                f"Only {len(common_base_ids)} valid pairs found (minimum 3 required).",
+                color="warning"), None, None
+
+        df_g1 = df_g1[df_g1['subject'].isin(g1_subjects)]
+        df_g2 = df_g2[df_g2['subject'].isin(g2_subjects)]
+
+    # ── Analyses par variable ──
     results = []
-    # cleaned_data = {}
     cleaned_data_dict = {}
     valid_variables = []
-    
-    for var in variables:
-        if var in df.columns:
-            # Nettoyage des données pour cette variable
-            df1_clean, df2_clean, n_pairs = clean_groups_for_variable(df_g1, df_g2, var, paired)
-            
-            if paired:
-                if n_pairs is None or n_pairs < 3:
-                    continue
-            else:
-                if len(df1_clean) < 3 or len(df2_clean) < 3:
-                    continue
-            
-            # Exécuter le test statistique
-            test_results = perform_group_comparison(
-                df1_clean[var],
-                df2_clean[var],
-                paired=paired
-            )
-            
-            if test_results:
-                test_results['variable'] = var
-                results.append(test_results)
 
-                # Stocker les données nettoyées pour les graphiques
-                cleaned_data_dict[var] = {
-                    'group1': df1_clean[var].tolist(),
-                    'group2': df2_clean[var].tolist(),
-                    'group1_subjects': df1_clean['subject'].tolist(),
-                    'group2_subjects': df2_clean['subject'].tolist()
-                }
-                # cleaned_data[var] = (df1_clean, df2_clean)
-                # valid_variables.append(var)
-    
+    for var in variables:
+        if var not in df.columns:
+            continue
+
+        df1_clean, df2_clean, n_pairs = clean_groups_for_variable(df_g1, df_g2, var, paired)
+
+        if paired:
+            if n_pairs is None or n_pairs < 3:
+                continue
+        else:
+            if len(df1_clean) < 3 or len(df2_clean) < 3:
+                continue
+
+        test_results = perform_group_comparison(df1_clean[var], df2_clean[var], paired=paired)
+
+        if test_results:
+            test_results['variable'] = var
+            results.append(test_results)
+            cleaned_data_dict[var] = {
+                'group1': df1_clean[var].tolist(),
+                'group2': df2_clean[var].tolist(),
+                'group1_subjects': df1_clean['subject'].tolist(),
+                'group2_subjects': df2_clean['subject'].tolist()
+            }
+            valid_variables.append(var)
+
     if not results:
-        return dbc.Alert("No valid analysis could be performed.", color="warning"), None
-    
-    # Créer le DataFrame des résultats
+        return dbc.Alert("No valid analysis could be performed.", color="warning"), None, None
+
+    # ── Résultats ──
     results_df = pd.DataFrame(results)
 
-    # ========== STOCKAGE DES RÉSULTATS POUR LE TÉLÉCHARGEMENT ==========
     results_store = {
         'results_df': results_df.to_dict('records'),
         'test_type': test_type,
-        'group1_info': {
-            'session': g1_session,
-            'sex': g1_sex,
-            'groups': g1_groups,
-            'n_subjects': len(g1_subjects)
-        },
-        'group2_info': {
-            'session': g2_session,
-            'sex': g2_sex,
-            'groups': g2_groups,
-            'n_subjects': len(g2_subjects)
-        }
+        'both_mode': both_mode,
+        'group1_info': {'session': g1_session, 'sex': g1_sex, 'groups': g1_groups, 'n_subjects': len(g1_subjects)},
+        'group2_info': {'session': g2_session, 'sex': g2_sex, 'groups': g2_groups, 'n_subjects': len(g2_subjects)}
     }
+    # if n_clicks is None or n_clicks == 0:
+    #     return html.Div("Configure the parameters and click on ‘Run T-Test Analysis’."), None, None
+    
+    # # Validation des paramètres
+    # if not all([g1_session, g2_session]):
+    #     return dbc.Alert("Please select a session for both groups.", color="warning"), None, None
+    
+    # if not variables:
+    #     return dbc.Alert("Please select at least one variable to compare.", color="warning"), None, None
+    
+    # # Sélectionner les données
+    # if dataset == 'master-store':
+    #     data = master_store
+    # elif dataset == 'dataset1':
+    #     data = data1
+    # else:
+    #     data = data2
+    
+    # if not data:
+    #     return dbc.Alert("No data available for analysis.", color="danger"), None, None
+    
+    # df = pd.DataFrame(data)
+    
+    # # Fonction pour obtenir les sujets d'un groupe
+    # def get_group_subjects(session, sex_filter, groups):
+    #     # Filtrer par session
+    #     subjects = df[df['subject'].str.contains(f"_ses-{session}")]['subject'].tolist()
+        
+    #     # Filtrer par sexe
+    #     if sex_filter != 'all' and 'sex' in df.columns:
+    #         gender = "M" if sex_filter == 'men' else "F"
+    #         subjects = df[
+    #             (df['subject'].isin(subjects)) & 
+    #             (df['sex'] == gender)
+    #         ]['subject'].tolist()
+        
+    #     # Filtrer par groupes
+    #     if groups:
+    #         subjects = [s for s in subjects if detect_group(s) in groups]
+    #     return subjects
+    
+    # # Obtenir les sujets pour chaque groupe
+    # g1_subjects = get_group_subjects(g1_session, g1_sex, g1_groups)
+    # g2_subjects = get_group_subjects(g2_session, g2_sex, g2_groups)
+    
+    # if len(g1_subjects) < 3 or len(g2_subjects) < 3:
+    #     return dbc.Alert(f"Groups too small: Group 1 ={len(g1_subjects)}, Group 2={len(g2_subjects)} (minimum of 3 required)", color="warning"), None, None
+    
+    # # Vérification pour test apparié
+    # paired = (test_type == 'paired')
+    # if paired:
+    #     # Extraire les identifiants de base
+    #     g1_base_ids = {subj.split('-V')[0] for subj in g1_subjects}
+    #     g2_base_ids = {subj.split('-V')[0] for subj in g2_subjects}
+    #     common_base_ids = g1_base_ids & g2_base_ids
+        
+    #     if not common_base_ids:
+    #         return dbc.Alert("No common subjects found for the paired test.", color="warning"), None, None
+        
+    #     # Filtrer pour ne garder que les paires valides
+    #     g1_subjects = [subj for subj in g1_subjects if subj.split('-V')[0] in common_base_ids]
+    #     g2_subjects = [subj for subj in g2_subjects if subj.split('-V')[0] in common_base_ids]
+        
+    #     if len(common_base_ids) < 3:
+    #         return dbc.Alert(f"Only {len(common_base_ids)} valid pairs found (minimum of 3 required).", color="warning"), None, None
+    
+    # # Préparer les données
+    # df_g1 = df[df['subject'].isin(g1_subjects)]
+    # df_g2 = df[df['subject'].isin(g2_subjects)]
+    
+    # # Exécuter les analyses pour chaque variable
+    # results = []
+    # # cleaned_data = {}
+    # cleaned_data_dict = {}
+    # valid_variables = []
+    
+    # for var in variables:
+    #     if var in df.columns:
+    #         # Nettoyage des données pour cette variable
+    #         df1_clean, df2_clean, n_pairs = clean_groups_for_variable(df_g1, df_g2, var, paired)
+            
+    #         if paired:
+    #             if n_pairs is None or n_pairs < 3:
+    #                 continue
+    #         else:
+    #             if len(df1_clean) < 3 or len(df2_clean) < 3:
+    #                 continue
+            
+    #         # Exécuter le test statistique
+    #         test_results = perform_group_comparison(
+    #             df1_clean[var],
+    #             df2_clean[var],
+    #             paired=paired
+    #         )
+            
+    #         if test_results:
+    #             test_results['variable'] = var
+    #             results.append(test_results)
+
+    #             # Stocker les données nettoyées pour les graphiques
+    #             cleaned_data_dict[var] = {
+    #                 'group1': df1_clean[var].tolist(),
+    #                 'group2': df2_clean[var].tolist(),
+    #                 'group1_subjects': df1_clean['subject'].tolist(),
+    #                 'group2_subjects': df2_clean['subject'].tolist()
+    #             }
+    #             # cleaned_data[var] = (df1_clean, df2_clean)
+    #             valid_variables.append(var)
+    
+    # if not results:
+    #     return dbc.Alert("No valid analysis could be performed.", color="warning"), None, None
+    
+    # # Créer le DataFrame des résultats
+    # results_df = pd.DataFrame(results)
+
+    # # ========== STOCKAGE DES RÉSULTATS POUR LE TÉLÉCHARGEMENT ==========
+    # results_store = {
+    #     'results_df': results_df.to_dict('records'),
+    #     'test_type': test_type,
+    #     'group1_info': {
+    #         'session': g1_session,
+    #         'sex': g1_sex,
+    #         'groups': g1_groups,
+    #         'n_subjects': len(g1_subjects)
+    #     },
+    #     'group2_info': {
+    #         'session': g2_session,
+    #         'sex': g2_sex,
+    #         'groups': g2_groups,
+    #         'n_subjects': len(g2_subjects)
+    #     }
+    # }
 
     # Interface avec onglets
     tabs = dbc.Tabs([
@@ -4656,7 +5181,7 @@ def run_ttest_analysis(n_clicks, test_type, dataset,
         )
     ])
     
-    return tabs, results_store
+    return tabs, results_store, cleaned_data_dict
 
 # Callback pour mettre à jour le dropdown des variables
 @app.callback(
@@ -4892,7 +5417,8 @@ def get_corr_subject_count(session, sex_filter, groups, dataset, data1, data2, m
 @app.callback(
     Output('corr-results-container', 'children'),
     [Input('run-corr-analysis', 'n_clicks')],
-    [State('corr-system-type1', 'value'),
+    [State('stats-analysis-type', 'value'),
+     State('corr-system-type1', 'value'),
      State('corr-system-type2', 'value'),
      State('corr-session1', 'value'),
      State('corr-sex1', 'value'),
@@ -4900,53 +5426,56 @@ def get_corr_subject_count(session, sex_filter, groups, dataset, data1, data2, m
      State('corr-session2', 'value'),
      State('corr-sex2', 'value'),
      State('corr-groups2', 'value'),
+     State('corr-subjects-personalized_1', 'value'),
+     State('corr-subjects-personalized_2', 'value'),
      State('stats-dataset', 'value'),
      State('dataset1-store', 'data'),
      State('dataset2-store', 'data'),
      State('master-store', 'data')]
 )
-def run_correlation_analysis(n_clicks, system_type1, system_type2, 
+def run_correlation_analysis(n_clicks, analysis_type, system_type1, system_type2,
                            session1, sex1, groups1, session2, sex2, groups2,
+                           corr_personalized_1, corr_personalized_2,
                            dataset, data1, data2, master_store):
     """Exécute l'analyse de corrélation avec deux sets indépendants"""
-    
+
     if n_clicks is None or n_clicks == 0:
         return html.Div()
-    
-    # Sélectionner les données
-    if dataset == 'master-store':
-        data = master_store
-    elif dataset == 'dataset1':
-        data = data1
-    elif dataset == 'dataset2':
-        data = data2
-    else:  # 'both'
-        return dbc.Alert("Please select a single dataset for correlation analysis", color="danger")
-    
-    if not data:
+
+    df = get_data_for_analysis(dataset, data1, data2, master_store)
+    if df is None:
         return dbc.Alert("No data available", color="danger")
-    
-    df = pd.DataFrame(data)
-    
+
     # Obtenir les sujets pour chaque set
-    subjects1, _, _, _ = get_subjects_by_criteria(
-        df, 
-        analysis_type="By session and sex", 
-        session=session1, 
-        sex_filter="Men only" if sex1 == "men" else "Women only" if sex1 == "women" else "All",
-        groups=groups1
-    )
-    
-    subjects2, _, _, _ = get_subjects_by_criteria(
-        df, 
-        analysis_type="By session and sex", 
-        session=session2, 
-        sex_filter="Men only" if sex2 == "men" else "Women only" if sex2 == "women" else "All",
-        groups=groups2
-    )
-    
-    if len(subjects1) < 3 or len(subjects2) < 3:
-        return dbc.Alert(f"Not enough subjects (Set 1: {len(subjects1)}, Set 2: {len(subjects2)} - minimum 3 each)", color="danger")
+    if analysis_type == 'personalized':
+        subjects1 = corr_personalized_1 or []
+        subjects2 = corr_personalized_2 or []
+        if len(subjects1) < 3 or len(subjects2) < 3:
+            return dbc.Alert(
+                f"Personalized mode: select at least 3 subjects per set "
+                f"(Set 1: {len(subjects1)}, Set 2: {len(subjects2)}).",
+                color="danger"
+            )
+    else:
+        subjects1, _, _, _ = get_subjects_by_criteria(
+            df,
+            analysis_type="By session and sex",
+            session=session1,
+            sex_filter="Men only" if sex1 == "men" else "Women only" if sex1 == "women" else "All",
+            groups=groups1
+        )
+        subjects2, _, _, _ = get_subjects_by_criteria(
+            df,
+            analysis_type="By session and sex",
+            session=session2,
+            sex_filter="Men only" if sex2 == "men" else "Women only" if sex2 == "women" else "All",
+            groups=groups2
+        )
+        if len(subjects1) < 3 or len(subjects2) < 3:
+            return dbc.Alert(
+                f"Not enough subjects (Set 1: {len(subjects1)}, Set 2: {len(subjects2)} - minimum 3 each)",
+                color="danger"
+            )
     
     # Définir les options de variables
     system_options = {
@@ -4966,7 +5495,11 @@ def run_correlation_analysis(n_clicks, system_type1, system_type2,
         ] if f"tract_inj_{sys}" in df.columns],
         "Clinical Outcomes": [col for col in df.columns 
                     if col not in ['subject', 'Sexe_bin', 'sex', 'lesion_volume']
-                    and not col.startswith(('loc_inj_', 'tract_inj_', 'pre_', 'post_'))]
+                    and not col.startswith(('loc_inj_', 'tract_inj_', 'pre_', 'post_'))
+                    #changed to match the API code
+                    and not str(col).startswith('Unnamed')
+                    and col != ''
+                    and pd.api.types.is_numeric_dtype(df[col])]
     }
     
     # Sélectionner les variables
@@ -5169,14 +5702,22 @@ def download_correlation_results(n_clicks, correlation_data):
     Output('data-explorer-content', 'children'),
     [Input('data-explorer-dataset', 'value')],
     [State('dataset1-store', 'data'),
-     State('dataset2-store', 'data')]
+     State('dataset2-store', 'data'),
+     State('master-store', 'data')]
 )
-def update_data_explorer(dataset_sel, data1, data2):
-    data = data1 if dataset_sel == 'dataset1' else data2
+def update_data_explorer(dataset_sel, data1, data2 , master_store):
+    # data = data1 if dataset_sel == 'dataset1' else data2
+    # if not data:
+    #     return html.Div("No data available")
+    if dataset_sel == 'dataset1':
+        data = data1
+    else:
+        data = data2 if data2 else master_store
+
     if not data:
         return html.Div("No data available")
-    
     df = pd.DataFrame(data)
+    #df = pd.DataFrame(data)
     
     return html.Div([
         html.H5(f"Dataset Preview ({dataset_sel})"),
@@ -5190,20 +5731,7 @@ def update_data_explorer(dataset_sel, data1, data2):
             style_header={'backgroundColor': 'rgb(230, 230, 230)', 'fontWeight': 'bold'}
         ),
         html.Div([
-        ]), # className="mb-2"),
-       
-        # html.Br(),
-        # html.H5("Column Summary"),
-        # html.Div([
-        #     html.Div([
-        #         html.H6("Numeric Columns"),
-        #         html.Ul([html.Li(col) for col in df.select_dtypes(include=[np.number]).columns])
-        #     ], className="col-md-6"),
-        #     html.Div([
-        #         html.H6("Categorical Columns"),
-        #         html.Ul([html.Li(col) for col in df.select_dtypes(include=['object']).columns])
-        #     ], className="col-md-6")
-        # ], className="row")
+        ]), 
     ])
 
 if __name__ == '__main__':

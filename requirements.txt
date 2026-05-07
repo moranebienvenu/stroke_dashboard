@@ -3,7 +3,8 @@ dash-bootstrap-components
 flask
 plotly
 pandas
-numpy == 2.3.4 # new version with "copy-on-write" induces bug
+numpy == 2.3.4 
 scipy
 statsmodels
 gunicorn
+openpyxl

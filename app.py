@@ -464,7 +464,7 @@ def sync_api_plots_to_dash(active_tab):
 # Callback pour synchroniser les overlays avec Dash
 @app.callback(
     Output('overlay-store', 'data'),
-    Input('add-overlay-btn', 'n_clicks'),
+    Input('overlay-generate-btn', 'n_clicks'),
     prevent_initial_call=True
 )
 def sync_overlay_to_dash(n_clicks):
@@ -1270,15 +1270,6 @@ def get_subjects_by_criteria(df, analysis_type, session=None, sex_filter="All", 
             
         return subjects, title,  sex_filter, session 
 
-# def get_dataset(dataset_sel, data1, data2, master_store, data_source):
-#     if dataset_sel == 'dataset1':
-#         return data1
-#     elif dataset_sel == 'dataset2':
-#         return data2
-#     elif data_source == 'master': # or dataset_sel == 'master':
-#         return master_store
-
-#     return None
 
 def get_dataset(dataset_sel, data1, data2, master_store, data_source):
     if dataset_sel == 'dataset1' and data1:
@@ -2374,8 +2365,6 @@ app.layout = dbc.Container([
         dbc.Tab(label="Data Explorer", tab_id="tab-data"),
     ], id="tabs", active_tab="tab-visualization", className="mb-3"),
 
-    html.Div(id="tab-content", style={'minHeight': '0'}),
-
     # ==================== PROFILE CONFIGURATION ====================
     html.Div(id="main-configuration-container", children=[
 
@@ -2490,7 +2479,7 @@ app.layout = dbc.Container([
 
     # ==================== OVERLAY ====================
     html.Div(id='enable-overlay-container', children=[
-        html.Label("Enable Overlay", className="fw-semibold small text-secondary mb-1"),
+        html.H4("Enable Overlay", style={'color': COLORS['primary'], 'fontWeight': '600', 'marginBottom': '8px'}),
         dcc.RadioItems(
             id='enable-overlay',
             options=[
@@ -2578,6 +2567,8 @@ app.layout = dbc.Container([
             ])
         ], className="mb-4 shadow-sm", style=CARD_STYLE)
     ], style={'display': 'none'}),
+
+    html.Div(id="tab-content", style={'minHeight': '0'}),
 
     # ==================== STATISTIQUES — CONTRÔLES CACHÉS ====================
     html.Div([
@@ -3083,23 +3074,10 @@ def create_visualization_tab(df1, df2):
     """Onglet Visualisation - SEULEMENT les graphiques et options d'affichage"""
     return html.Div([
         html.H3(" Visualization Results"),
-        
-        # Graphiques (les mêmes IDs que dans votre layout principal)
-        dbc.Row([
-            dbc.Col(dcc.Graph(id='graph1',
-                             figure=EMPTY_FIG,
-                             config={'displayModeBar': True}), width=4),
-            dbc.Col(dcc.Graph(id='graph2',
-                             figure=EMPTY_FIG,
-                             config={'displayModeBar': True}), width=4),
-            dbc.Col(dcc.Graph(id='graph3',
-                             figure=EMPTY_FIG,
-                             config={'displayModeBar': True}), width=4)
-        ]),
-        
+
         html.Hr(),
         html.H4("Display Options"),
-        
+
         # Options d'affichage spécifiques à la visualisation
         dbc.Row([
             dbc.Col([
@@ -3114,9 +3092,25 @@ def create_visualization_tab(df1, df2):
                     inline=True
                 )
             ], width=4),
-         ]),
-         html.Div(id='data-table-container') #modifier
-      ])
+        ], className="mb-3"),
+
+        html.Hr(),
+
+        # Graphiques
+        dbc.Row([
+            dbc.Col(dcc.Graph(id='graph1',
+                             figure=EMPTY_FIG,
+                             config={'displayModeBar': True}), width=4),
+            dbc.Col(dcc.Graph(id='graph2',
+                             figure=EMPTY_FIG,
+                             config={'displayModeBar': True}), width=4),
+            dbc.Col(dcc.Graph(id='graph3',
+                             figure=EMPTY_FIG,
+                             config={'displayModeBar': True}), width=4)
+        ]),
+
+        html.Div(id='data-table-container')
+    ])
 
 def create_statistics_tab(df1, df2):
     """Onglet Statistiques — les contrôles sont dans le layout statique en dessous"""
